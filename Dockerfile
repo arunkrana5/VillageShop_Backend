@@ -5,6 +5,7 @@ WORKDIR /src
 # Copy csproj files and restore dependencies
 COPY ["src/VillageShop.Api/VillageShop.Api.csproj", "src/VillageShop.Api/"]
 COPY ["src/VillageShop.Application/VillageShop.Application.csproj", "src/VillageShop.Application/"]
+COPY ["src/VillageShop.Common/VillageShop.Common.csproj", "src/VillageShop.Common/"]
 COPY ["src/VillageShop.Domain/VillageShop.Domain.csproj", "src/VillageShop.Domain/"]
 COPY ["src/VillageShop.Infrastructure/VillageShop.Infrastructure.csproj", "src/VillageShop.Infrastructure/"]
 
