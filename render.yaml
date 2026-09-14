@@ -1,0 +1,10 @@
+services:
+  - type: web
+    name: villageshop-api
+    env: docker
+    dockerfilePath: Dockerfile
+    plan: free
+    region: singapore
+    envVars:
+      - key: ASPNETCORE_ENVIRONMENT
+        value: Production

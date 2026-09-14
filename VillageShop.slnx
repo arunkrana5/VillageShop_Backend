@@ -1,0 +1,12 @@
+<Solution>
+  <Folder Name="/src/">
+    <Project Path="src/VillageShop.Api/VillageShop.Api.csproj" />
+    <Project Path="src/VillageShop.Application/VillageShop.Application.csproj" />
+    <Project Path="src/VillageShop.Common/VillageShop.Common.csproj" />
+    <Project Path="src/VillageShop.Domain/VillageShop.Domain.csproj" />
+    <Project Path="src/VillageShop.Infrastructure/VillageShop.Infrastructure.csproj" />
+  </Folder>
+  <Folder Name="/tests/">
+    <Project Path="tests/VillageShop.Tests/VillageShop.Tests.csproj" />
+  </Folder>
+</Solution>
