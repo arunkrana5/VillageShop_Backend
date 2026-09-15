@@ -36,7 +36,8 @@ public class ExceptionHandlingMiddleware
         context.Response.ContentType = "application/json";
         context.Response.StatusCode = StatusCodes.Status500InternalServerError;
 
-        var response = PostResponse.Error("An unexpected server error occurred. Please try again later.", 500);
+        var errorDetails = $"Server Error: {exception.Message} | Inner: {exception.InnerException?.Message}";
+        var response = PostResponse.Error(errorDetails, 500);
         var json = JsonSerializer.Serialize(response);
         return context.Response.WriteAsync(json);
     }
