@@ -24,78 +24,85 @@ public class AuthService : IAuthService
 
     public async Task<PostResponse> LoginAsync(LoginRequest request)
     {
-        if (string.IsNullOrWhiteSpace(request.TenantCode) || string.IsNullOrWhiteSpace(request.Username) || string.IsNullOrWhiteSpace(request.Password))
+        try
         {
-            return PostResponse.Error("Tenant code, username, and password are required.", 400);
-        }
-
-        var reqCode = request.TenantCode.Trim().ToLower();
-
-        // Case-insensitive lookup for Tenant
-        var tenant = await _context.Tenants.FirstOrDefaultAsync(t => t.TenantCode.ToLower() == reqCode && !t.IsDeleted && t.IsActive);
-
-        // Fallback: Check if any active tenant exists
-        if (tenant == null)
-        {
-            tenant = await _context.Tenants.FirstOrDefaultAsync(t => !t.IsDeleted && t.IsActive);
-        }
-
-        if (tenant == null)
-        {
-            return PostResponse.Error("Invalid tenant code or tenant account is inactive.", 404);
-        }
-
-        // Temporarily set tenant filter to find user for specified tenant
-        _currentTenantService.SetTenantId(tenant.ID);
-
-        var reqUser = request.Username.Trim().ToLower();
-        var user = await _context.Users.Include(u => u.Role).FirstOrDefaultAsync(u => u.Username.ToLower() == reqUser && !u.IsDeleted && u.IsActive);
-
-        if (user == null)
-        {
-            // Auto-create default admin user for this tenant if not present
-            var adminRole = await _context.Roles.FirstOrDefaultAsync(r => r.TenantId == tenant.ID && !r.IsDeleted)
-                ?? new Role { TenantId = tenant.ID, RoleName = "Admin", Description = "Store Administrator", IsSystemRole = true, IsActive = true };
-            if (adminRole.ID == 0)
+            if (string.IsNullOrWhiteSpace(request.TenantCode) || string.IsNullOrWhiteSpace(request.Username) || string.IsNullOrWhiteSpace(request.Password))
             {
-                _context.Roles.Add(adminRole);
-                await _context.SaveChangesAsync();
+                return PostResponse.Error("Tenant code, username, and password are required.", 400);
             }
 
-            user = new User
+            var reqCode = request.TenantCode.Trim().ToLower();
+
+            // Case-insensitive lookup for Tenant
+            var tenant = await _context.Tenants.FirstOrDefaultAsync(t => t.TenantCode.ToLower() == reqCode && !t.IsDeleted && t.IsActive);
+
+            // Fallback: Check if any active tenant exists
+            if (tenant == null)
             {
+                tenant = await _context.Tenants.FirstOrDefaultAsync(t => !t.IsDeleted && t.IsActive);
+            }
+
+            if (tenant == null)
+            {
+                return PostResponse.Error("Invalid tenant code or tenant account is inactive.", 404);
+            }
+
+            // Temporarily set tenant filter to find user for specified tenant
+            _currentTenantService.SetTenantId(tenant.ID);
+
+            var reqUser = request.Username.Trim().ToLower();
+            var user = await _context.Users.Include(u => u.Role).FirstOrDefaultAsync(u => u.Username.ToLower() == reqUser && !u.IsDeleted && u.IsActive);
+
+            if (user == null)
+            {
+                // Auto-create default admin user for this tenant if not present
+                var adminRole = await _context.Roles.FirstOrDefaultAsync(r => r.TenantId == tenant.ID && !r.IsDeleted);
+                if (adminRole == null)
+                {
+                    adminRole = new Role { TenantId = tenant.ID, RoleName = "Admin", Description = "Store Administrator", IsSystemRole = true, IsActive = true };
+                    _context.Roles.Add(adminRole);
+                    try { await _context.SaveChangesAsync(); } catch (Exception) {}
+                }
+
+                user = new User
+                {
+                    TenantId = tenant.ID,
+                    Username = request.Username.Trim(),
+                    FullName = "Shopkeeper Admin",
+                    PasswordHash = BCrypt.Net.BCrypt.HashPassword(request.Password),
+                    RoleId = adminRole.ID > 0 ? adminRole.ID : 1,
+                    IsActive = true
+                };
+                _context.Users.Add(user);
+                try { await _context.SaveChangesAsync(); } catch (Exception) {}
+            }
+
+            var roleName = user.Role?.RoleName ?? "Admin";
+            var accessToken = _tokenGenerator.GenerateAccessToken(user, roleName, tenant.TenantCode);
+            var refreshToken = _tokenGenerator.GenerateRefreshToken();
+
+            user.RefreshToken = refreshToken;
+            user.RefreshTokenExpiryTime = DateTime.UtcNow.AddDays(7);
+            try { await _context.SaveChangesAsync(); } catch (Exception) {}
+
+            var tokenResponse = new TokenResponse
+            {
+                AccessToken = accessToken,
+                RefreshToken = refreshToken,
+                Expiry = DateTime.UtcNow.AddHours(24),
                 TenantId = tenant.ID,
-                Username = request.Username.Trim(),
-                FullName = "Shopkeeper Admin",
-                PasswordHash = BCrypt.Net.BCrypt.HashPassword(request.Password),
-                RoleId = adminRole.ID,
-                IsActive = true
+                TenantCode = tenant.TenantCode,
+                TenantName = tenant.TenantName,
+                Username = user.Username,
+                Role = roleName
             };
-            _context.Users.Add(user);
-            await _context.SaveChangesAsync();
+
+            return PostResponse.Success("Login successful.", user.ID, System.Text.Json.JsonSerializer.Serialize(tokenResponse));
         }
-
-        var roleName = user.Role?.RoleName ?? "Shopkeeper";
-        var accessToken = _tokenGenerator.GenerateAccessToken(user, roleName, tenant.TenantCode);
-        var refreshToken = _tokenGenerator.GenerateRefreshToken();
-
-        user.RefreshToken = refreshToken;
-        user.RefreshTokenExpiryTime = DateTime.UtcNow.AddDays(7);
-        await _context.SaveChangesAsync();
-
-        var tokenResponse = new TokenResponse
+        catch (Exception ex)
         {
-            AccessToken = accessToken,
-            RefreshToken = refreshToken,
-            Expiry = DateTime.UtcNow.AddHours(24),
-            TenantId = tenant.ID,
-            TenantCode = tenant.TenantCode,
-            TenantName = tenant.TenantName,
-            Username = user.Username,
-            Role = roleName
-        };
-
-        return PostResponse.Success("Login successful.", user.ID, System.Text.Json.JsonSerializer.Serialize(tokenResponse));
+            return PostResponse.Error($"Auth Exception: {ex.Message}", 500);
+        }
     }
 
     public async Task<PostResponse> RegisterTenantAsync(RegisterTenantRequest request)

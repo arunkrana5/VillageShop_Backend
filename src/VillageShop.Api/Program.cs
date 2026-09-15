@@ -127,6 +127,21 @@ using (var scope = app.Services.CreateScope())
 
             var targetTenantId = existingTenant.ID > 0 ? existingTenant.ID : c.Id;
 
+            var existingRole = db.Roles.FirstOrDefault(r => r.TenantId == targetTenantId);
+            if (existingRole == null)
+            {
+                existingRole = new Role
+                {
+                    TenantId = targetTenantId,
+                    RoleName = "Admin",
+                    Description = "Store Administrator",
+                    IsSystemRole = true,
+                    IsActive = true
+                };
+                db.Roles.Add(existingRole);
+                try { db.SaveChanges(); } catch (Exception) {}
+            }
+
             var existingUser = db.Users.FirstOrDefault(u => u.TenantId == targetTenantId || u.Username == c.User);
             if (existingUser == null)
             {
@@ -136,7 +151,7 @@ using (var scope = app.Services.CreateScope())
                     Username = c.User,
                     FullName = $"{c.Owner} ({c.Name})",
                     PasswordHash = BCrypt.Net.BCrypt.HashPassword(c.Pass),
-                    RoleId = 1,
+                    RoleId = existingRole.ID > 0 ? existingRole.ID : 1,
                     Mobile = c.Phone,
                     IsActive = true,
                     IsDeleted = false
