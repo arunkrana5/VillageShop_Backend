@@ -25,7 +25,7 @@ builder.Services.AddSwaggerGen();
 var connectionString = builder.Configuration.GetConnectionString("DefaultConnection");
 builder.Services.AddDbContext<ApplicationDbContext>(options =>
 {
-    if (!string.IsNullOrEmpty(connectionString))
+    if (!string.IsNullOrEmpty(connectionString) && !connectionString.Contains("localdb", StringComparison.OrdinalIgnoreCase))
     {
         options.UseSqlServer(connectionString);
     }
