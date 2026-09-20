@@ -1,5 +1,6 @@
 using System.Text;
 using Microsoft.AspNetCore.Authentication.JwtBearer;
+using Microsoft.AspNetCore.StaticFiles;
 using Microsoft.EntityFrameworkCore;
 using Microsoft.IdentityModel.Tokens;
 using VillageShop.Api.Middleware;
@@ -201,14 +202,32 @@ app.UseSwaggerUI(c =>
     c.RoutePrefix = "swagger";
 });
 
+var contentTypeProvider = new FileExtensionContentTypeProvider();
+contentTypeProvider.Mappings[".apk"] = "application/vnd.android.package-archive";
+
 app.UseDefaultFiles();
-app.UseStaticFiles();
+app.UseStaticFiles(new StaticFileOptions
+{
+    ContentTypeProvider = contentTypeProvider,
+    ServeUnknownFileTypes = true
+});
 
 app.UseCors("AllowAll");
 
 app.UseAuthentication();
 app.UseMiddleware<TenantResolutionMiddleware>();
 app.UseAuthorization();
+
+app.MapGet("/VillageShop.apk", (IWebHostEnvironment env) =>
+{
+    var webRoot = env.WebRootPath ?? Path.Combine(AppContext.BaseDirectory, "wwwroot");
+    var apkPath = Path.Combine(webRoot, "VillageShop.apk");
+    if (System.IO.File.Exists(apkPath))
+    {
+        return Results.File(apkPath, "application/vnd.android.package-archive", "VillageShop.apk");
+    }
+    return Results.NotFound("VillageShop APK file is not available.");
+});
 
 app.MapControllers();
 app.MapFallbackToFile("index.html");
