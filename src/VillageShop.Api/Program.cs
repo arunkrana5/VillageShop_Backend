@@ -218,16 +218,37 @@ app.UseAuthentication();
 app.UseMiddleware<TenantResolutionMiddleware>();
 app.UseAuthorization();
 
-app.MapGet("/VillageShop.apk", (IWebHostEnvironment env) =>
+app.MapGet("/VillageShop.apk", (IWebHostEnvironment env) => ServeApkFile(env));
+app.MapGet("/api/app/download", (IWebHostEnvironment env) => ServeApkFile(env));
+
+IResult ServeApkFile(IWebHostEnvironment env)
 {
-    var webRoot = env.WebRootPath ?? Path.Combine(AppContext.BaseDirectory, "wwwroot");
-    var apkPath = Path.Combine(webRoot, "VillageShop.apk");
-    if (System.IO.File.Exists(apkPath))
+    var searchDirs = new[]
     {
-        return Results.File(apkPath, "application/vnd.android.package-archive", "VillageShop.apk");
+        env.WebRootPath,
+        Path.Combine(AppContext.BaseDirectory, "wwwroot"),
+        Path.Combine(Directory.GetCurrentDirectory(), "wwwroot")
+    };
+
+    foreach (var dir in searchDirs)
+    {
+        if (string.IsNullOrEmpty(dir) || !Directory.Exists(dir)) continue;
+
+        var exactPath = Path.Combine(dir, "VillageShop.apk");
+        if (System.IO.File.Exists(exactPath))
+        {
+            return Results.File(exactPath, "application/vnd.android.package-archive", "VillageShop.apk");
+        }
+
+        var anyApk = Directory.GetFiles(dir, "*.apk", SearchOption.TopDirectoryOnly).FirstOrDefault();
+        if (anyApk != null)
+        {
+            return Results.File(anyApk, "application/vnd.android.package-archive", "VillageShop.apk");
+        }
     }
-    return Results.NotFound("VillageShop APK file is not available.");
-});
+
+    return Results.NotFound("VillageShop APK file is not available on server.");
+}
 
 app.MapControllers();
 app.MapFallbackToFile("index.html");
