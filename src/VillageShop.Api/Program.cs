@@ -251,6 +251,7 @@ IResult ServeApkFile(IWebHostEnvironment env)
 }
 
 app.MapControllers();
+app.MapFallbackToFile("pos/{*path}", "pos/index.html");
 app.MapFallbackToFile("index.html");
 
 app.Run();
