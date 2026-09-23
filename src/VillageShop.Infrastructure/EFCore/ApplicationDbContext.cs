@@ -42,6 +42,16 @@ public class ApplicationDbContext : DbContext, IApplicationDbContext
     {
         base.OnModelCreating(modelBuilder);
 
+        // Enforce V_ table prefix for all VillageShop entities
+        foreach (var entityType in modelBuilder.Model.GetEntityTypes())
+        {
+            var tableName = entityType.GetTableName();
+            if (!string.IsNullOrEmpty(tableName) && !tableName.StartsWith("V_"))
+            {
+                entityType.SetTableName("V_" + tableName);
+            }
+        }
+
         // Tenant unique index
         modelBuilder.Entity<Tenant>()
             .HasIndex(t => t.TenantCode)

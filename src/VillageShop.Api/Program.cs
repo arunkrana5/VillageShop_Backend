@@ -2,6 +2,8 @@ using System.Text;
 using Microsoft.AspNetCore.Authentication.JwtBearer;
 using Microsoft.AspNetCore.StaticFiles;
 using Microsoft.EntityFrameworkCore;
+using Microsoft.EntityFrameworkCore.Infrastructure;
+using Microsoft.EntityFrameworkCore.Storage;
 using Microsoft.IdentityModel.Tokens;
 using VillageShop.Api.Middleware;
 using VillageShop.Application.Auth.Services;
@@ -22,19 +24,19 @@ builder.Services.AddControllers();
 builder.Services.AddEndpointsApiExplorer();
 builder.Services.AddSwaggerGen();
 
-// Configure SQL Server DB Context
+// Configure SQL Server DB Context (Pinned to 185.100.212.57,1433 dev.inhouse)
 var connectionString = builder.Configuration.GetConnectionString("DefaultConnection");
+if (string.IsNullOrWhiteSpace(connectionString))
+{
+    connectionString = "Server=185.100.212.57,1433;Database=dev.inhouse;User Id=sa;Password=Thrivera@1701;TrustServerCertificate=True;Encrypt=False;";
+}
+
 builder.Services.AddDbContext<ApplicationDbContext>(options =>
 {
-    if (!string.IsNullOrEmpty(connectionString) && !connectionString.Contains("localdb", StringComparison.OrdinalIgnoreCase))
+    options.UseSqlServer(connectionString, sqlOpts =>
     {
-        options.UseSqlServer(connectionString);
-    }
-    else
-    {
-        var dbPath = Path.Combine(AppContext.BaseDirectory, "villageshop_database.db");
-        options.UseSqlite($"Data Source={dbPath}");
-    }
+        sqlOpts.EnableRetryOnFailure(maxRetryCount: 5, maxRetryDelay: TimeSpan.FromSeconds(30), errorNumbersToAdd: null);
+    });
 });
 
 builder.Services.AddScoped<IApplicationDbContext>(provider => provider.GetRequiredService<ApplicationDbContext>());
@@ -88,7 +90,7 @@ using (var scope = app.Services.CreateScope())
     try
     {
         var db = scope.ServiceProvider.GetRequiredService<ApplicationDbContext>();
-        db.Database.EnsureCreated();
+        try { db.Database.EnsureCreated(); } catch (Exception) {}
 
         // Ensure All 4 SaaS Client Tenants & Dedicated User Accounts exist in DB
         var targetClients = new[]
