@@ -253,6 +253,21 @@ IResult ServeApkFile(IWebHostEnvironment env)
 }
 
 app.MapControllers();
+
+app.MapGet("/", async (HttpContext context) =>
+{
+    var filePath = Path.Combine(app.Environment.WebRootPath, "index.html");
+    context.Response.ContentType = "text/html";
+    await context.Response.SendFileAsync(filePath);
+});
+
+app.MapGet("/admin", async (HttpContext context) =>
+{
+    var filePath = Path.Combine(app.Environment.WebRootPath, "admin", "index.html");
+    context.Response.ContentType = "text/html";
+    await context.Response.SendFileAsync(filePath);
+});
+
 app.MapFallbackToFile("admin/{*path}", "admin/index.html");
 app.MapFallbackToFile("index.html");
 
