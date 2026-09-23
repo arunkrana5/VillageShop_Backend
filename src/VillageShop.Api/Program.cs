@@ -207,7 +207,6 @@ app.UseSwaggerUI(c =>
 var contentTypeProvider = new FileExtensionContentTypeProvider();
 contentTypeProvider.Mappings[".apk"] = "application/vnd.android.package-archive";
 
-app.UseDefaultFiles();
 app.UseStaticFiles(new StaticFileOptions
 {
     ContentTypeProvider = contentTypeProvider,
