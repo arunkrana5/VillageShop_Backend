@@ -48,13 +48,43 @@ public class SettingsController : ControllerBase
     [HttpGet("config")]
     public async Task<IActionResult> GetMobileConfig([FromQuery] long? tenantId, [FromQuery] string? tenantCode, [FromQuery] string? code)
     {
-        long targetTenantId = tenantId ?? await ResolveTenantIdAsync(null, tenantCode ?? code);
-        if (targetTenantId <= 0) targetTenantId = 1;
+        long targetTenantId = tenantId ?? await ResolveTenantIdAsync(null, tenantCode ?? code, 0);
 
-        if (Request.Headers.TryGetValue("X-Tenant-Id", out var headerTidStr) && long.TryParse(headerTidStr, out var headerTid) && headerTid > 0)
+        if (targetTenantId <= 0 && Request.Headers.TryGetValue("X-Tenant-Id", out var headerTidStr) && long.TryParse(headerTidStr, out var headerTid) && headerTid > 0)
         {
             targetTenantId = headerTid;
         }
+
+        if (targetTenantId <= 0 && Request.Headers.TryGetValue("X-Tenant-Code", out var headerTCode) && !string.IsNullOrWhiteSpace(headerTCode))
+        {
+            targetTenantId = await ResolveTenantIdAsync(null, headerTCode, 0);
+        }
+
+        if (targetTenantId <= 0 && Request.Headers.TryGetValue("Authorization", out var authHeader) && authHeader.ToString().StartsWith("Bearer ", StringComparison.OrdinalIgnoreCase))
+        {
+            try
+            {
+                var tokenStr = authHeader.ToString().Substring(7).Trim();
+                var handler = new System.IdentityModel.Tokens.Jwt.JwtSecurityTokenHandler();
+                if (handler.CanReadToken(tokenStr))
+                {
+                    var jwt = handler.ReadJwtToken(tokenStr);
+                    var tidClaim = jwt.Claims.FirstOrDefault(c => c.Type == "tenant_id")?.Value;
+                    var tcodeClaim = jwt.Claims.FirstOrDefault(c => c.Type == "tenant_code")?.Value;
+                    if (long.TryParse(tidClaim, out var parsedTid) && parsedTid > 0)
+                    {
+                        targetTenantId = parsedTid;
+                    }
+                    else if (!string.IsNullOrWhiteSpace(tcodeClaim))
+                    {
+                        targetTenantId = await ResolveTenantIdAsync(null, tcodeClaim, 0);
+                    }
+                }
+            }
+            catch (Exception) {}
+        }
+
+        if (targetTenantId <= 0) targetTenantId = 1;
 
         var config = await GetOrLoadTenantConfigAsync(targetTenantId);
         var jsonConfig = JsonSerializer.Serialize(config, JsonOpts);
