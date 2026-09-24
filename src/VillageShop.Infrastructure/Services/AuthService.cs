@@ -36,45 +36,41 @@ public class AuthService : IAuthService
             // Case-insensitive lookup for Tenant
             var tenant = await _context.Tenants.FirstOrDefaultAsync(t => t.TenantCode.ToLower() == reqCode && !t.IsDeleted && t.IsActive);
 
-            // Fallback: Check if any active tenant exists
             if (tenant == null)
             {
-                tenant = await _context.Tenants.FirstOrDefaultAsync(t => !t.IsDeleted && t.IsActive);
+                return PostResponse.Error("Invalid tenant code or tenant account is inactive.", 401);
             }
 
-            if (tenant == null)
-            {
-                return PostResponse.Error("Invalid tenant code or tenant account is inactive.", 404);
-            }
-
-            // Temporarily set tenant filter to find user for specified tenant
+            // Set tenant filter to find user for specified tenant
             _currentTenantService.SetTenantId(tenant.ID);
 
             var reqUser = request.Username.Trim().ToLower();
-            var user = await _context.Users.Include(u => u.Role).FirstOrDefaultAsync(u => u.Username.ToLower() == reqUser && !u.IsDeleted && u.IsActive);
+            var user = await _context.Users.Include(u => u.Role).FirstOrDefaultAsync(u => u.TenantId == tenant.ID && u.Username.ToLower() == reqUser && !u.IsDeleted && u.IsActive);
 
             if (user == null)
             {
-                // Auto-create default admin user for this tenant if not present
-                var adminRole = await _context.Roles.FirstOrDefaultAsync(r => r.TenantId == tenant.ID && !r.IsDeleted);
-                if (adminRole == null)
+                return PostResponse.Error("Invalid username or password.", 401);
+            }
+
+            // Verify password using BCrypt
+            bool isPasswordValid = false;
+            try
+            {
+                isPasswordValid = BCrypt.Net.BCrypt.Verify(request.Password, user.PasswordHash);
+            }
+            catch (Exception)
+            {
+                if (user.PasswordHash == request.Password)
                 {
-                    adminRole = new Role { TenantId = tenant.ID, RoleName = "Admin", Description = "Store Administrator", IsSystemRole = true, IsActive = true };
-                    _context.Roles.Add(adminRole);
+                    isPasswordValid = true;
+                    user.PasswordHash = BCrypt.Net.BCrypt.HashPassword(request.Password);
                     try { await _context.SaveChangesAsync(); } catch (Exception) {}
                 }
+            }
 
-                user = new User
-                {
-                    TenantId = tenant.ID,
-                    Username = request.Username.Trim(),
-                    FullName = "Shopkeeper Admin",
-                    PasswordHash = BCrypt.Net.BCrypt.HashPassword(request.Password),
-                    RoleId = adminRole.ID > 0 ? adminRole.ID : 1,
-                    IsActive = true
-                };
-                _context.Users.Add(user);
-                try { await _context.SaveChangesAsync(); } catch (Exception) {}
+            if (!isPasswordValid)
+            {
+                return PostResponse.Error("Invalid username or password.", 401);
             }
 
             var roleName = user.Role?.RoleName ?? "Admin";
