@@ -34,7 +34,7 @@ public class AuthService : IAuthService
             var reqCode = request.TenantCode.Trim().ToLower();
 
             // Case-insensitive lookup for Tenant
-            var tenant = await _context.Tenants.FirstOrDefaultAsync(t => t.TenantCode.ToLower() == reqCode && !t.IsDeleted && t.IsActive);
+            var tenant = await _context.Tenants.IgnoreQueryFilters().FirstOrDefaultAsync(t => t.TenantCode.ToLower() == reqCode && !t.IsDeleted && t.IsActive);
 
             if (tenant == null)
             {
@@ -45,7 +45,7 @@ public class AuthService : IAuthService
             _currentTenantService.SetTenantId(tenant.ID);
 
             var reqUser = request.Username.Trim().ToLower();
-            var user = await _context.Users.Include(u => u.Role).FirstOrDefaultAsync(u => u.TenantId == tenant.ID && u.Username.ToLower() == reqUser && !u.IsDeleted && u.IsActive);
+            var user = await _context.Users.IgnoreQueryFilters().Include(u => u.Role).FirstOrDefaultAsync(u => u.TenantId == tenant.ID && u.Username.ToLower() == reqUser && !u.IsDeleted && u.IsActive);
 
             if (user == null)
             {
