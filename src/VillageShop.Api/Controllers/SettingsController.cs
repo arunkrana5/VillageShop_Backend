@@ -226,7 +226,7 @@ public class SettingsController : ControllerBase
             var featureJsonStr = JsonSerializer.Serialize(featureObj, JsonOpts);
             var menuJsonStr = JsonSerializer.Serialize(newConfig.MenuItems, JsonOpts);
 
-            var existingConfig = await _context.TenantConfigurations.FirstOrDefaultAsync(c => c.TenantId == targetTenantId && !c.IsDeleted);
+            var existingConfig = await _context.TenantConfigurations.IgnoreQueryFilters().FirstOrDefaultAsync(c => c.TenantId == targetTenantId && !c.IsDeleted);
             if (existingConfig == null)
             {
                 existingConfig = new TenantConfiguration
@@ -246,6 +246,7 @@ public class SettingsController : ControllerBase
             }
 
             await _context.SaveChangesAsync();
+            _tenantConfigCache.TryRemove(targetTenantId, out _);
         }
         catch (Exception) {}
 
@@ -416,7 +417,7 @@ public class SettingsController : ControllerBase
 
         try
         {
-            var dbConfig = await _context.TenantConfigurations.FirstOrDefaultAsync(c => c.TenantId == tenantId && !c.IsDeleted);
+            var dbConfig = await _context.TenantConfigurations.IgnoreQueryFilters().OrderByDescending(c => c.ID).FirstOrDefaultAsync(c => c.TenantId == tenantId && !c.IsDeleted);
             if (dbConfig != null && !string.IsNullOrWhiteSpace(dbConfig.BrandingJson))
             {
                 var loadedBranding = JsonSerializer.Deserialize<MobileTenantConfig>(dbConfig.BrandingJson, JsonOpts)
