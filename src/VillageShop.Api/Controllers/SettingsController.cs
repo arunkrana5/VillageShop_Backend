@@ -256,6 +256,129 @@ public class SettingsController : ControllerBase
         });
     }
 
+    [HttpPost("tenants")]
+    public async Task<IActionResult> CreateTenant([FromBody] CreateTenantRequest req)
+    {
+        if (req == null || string.IsNullOrWhiteSpace(req.Code) || string.IsNullOrWhiteSpace(req.Name))
+        {
+            return BadRequest(new PostResponse
+            {
+                Status = false,
+                StatusCode = 400,
+                Message = "Tenant code and name are required."
+            });
+        }
+
+        var cleanCode = req.Code.Trim().ToUpper();
+        var existing = await _context.Tenants.FirstOrDefaultAsync(t => t.TenantCode == cleanCode && !t.IsDeleted);
+        if (existing != null)
+        {
+            return BadRequest(new PostResponse
+            {
+                Status = false,
+                StatusCode = 400,
+                Message = $"Tenant code '{cleanCode}' already exists."
+            });
+        }
+
+        var tenant = new Tenant
+        {
+            TenantCode = cleanCode,
+            TenantName = req.Name.Trim(),
+            OwnerName = string.IsNullOrWhiteSpace(req.OwnerName) ? "Store Owner" : req.OwnerName.Trim(),
+            Mobile = string.IsNullOrWhiteSpace(req.OwnerPhone) ? "+91 98765 43210" : req.OwnerPhone.Trim(),
+            Email = req.Email,
+            Village = req.Village ?? "Rampur",
+            IsActive = req.ActiveStatus != "SUSPENDED" && req.ActiveStatus != "INACTIVE"
+        };
+
+        _context.Tenants.Add(tenant);
+        await _context.SaveChangesAsync();
+
+        try
+        {
+            var role = new Role
+            {
+                TenantId = tenant.ID,
+                RoleName = "Admin",
+                Description = "Store Administrator",
+                IsSystemRole = true,
+                IsActive = true
+            };
+            _context.Roles.Add(role);
+            await _context.SaveChangesAsync();
+
+            var passHash = BCrypt.Net.BCrypt.HashPassword("admin123");
+            var user = new User
+            {
+                TenantId = tenant.ID,
+                Username = "admin",
+                FullName = tenant.OwnerName,
+                Mobile = tenant.Mobile,
+                Email = tenant.Email,
+                PasswordHash = passHash,
+                RoleId = role.ID,
+                IsActive = true
+            };
+            _context.Users.Add(user);
+            await _context.SaveChangesAsync();
+
+            await CreateAndSeedDefaultTenantConfigInDbAsync(tenant.ID);
+        }
+        catch (Exception) {}
+
+        return Ok(new PostResponse
+        {
+            Status = true,
+            StatusCode = 200,
+            Message = $"Client store tenant '{tenant.TenantName}' ({tenant.TenantCode}) created successfully.",
+            ID = (int)tenant.ID
+        });
+    }
+
+    [HttpPut("tenants/{id}")]
+    public async Task<IActionResult> UpdateTenant(long id, [FromBody] CreateTenantRequest req)
+    {
+        var tenant = await _context.Tenants.FirstOrDefaultAsync(t => t.ID == id && !t.IsDeleted);
+        if (tenant == null)
+        {
+            return NotFound(new PostResponse { Status = false, StatusCode = 404, Message = "Tenant not found." });
+        }
+
+        if (!string.IsNullOrWhiteSpace(req.Name)) tenant.TenantName = req.Name.Trim();
+        if (!string.IsNullOrWhiteSpace(req.OwnerName)) tenant.OwnerName = req.OwnerName.Trim();
+        if (!string.IsNullOrWhiteSpace(req.OwnerPhone)) tenant.Mobile = req.OwnerPhone.Trim();
+        if (req.ActiveStatus != null) tenant.IsActive = req.ActiveStatus == "ACTIVE";
+
+        await _context.SaveChangesAsync();
+
+        return Ok(new PostResponse
+        {
+            Status = true,
+            StatusCode = 200,
+            Message = $"Tenant '{tenant.TenantName}' updated successfully."
+        });
+    }
+
+    [HttpDelete("tenants/{id}")]
+    public async Task<IActionResult> DeleteTenant(long id)
+    {
+        var tenant = await _context.Tenants.FirstOrDefaultAsync(t => t.ID == id);
+        if (tenant != null)
+        {
+            tenant.IsDeleted = true;
+            tenant.IsActive = false;
+            await _context.SaveChangesAsync();
+        }
+
+        return Ok(new PostResponse
+        {
+            Status = true,
+            StatusCode = 200,
+            Message = "Tenant deleted successfully."
+        });
+    }
+
     private async Task<MobileTenantConfig> GetOrLoadTenantConfigAsync(long tenantId)
     {
         if (_tenantConfigCache.TryGetValue(tenantId, out var cached)) return cached;
@@ -498,4 +621,16 @@ public class MobileTenantConfig
 
     public List<MenuItemConfig> MenuItems { get; set; } = new List<MenuItemConfig>();
     public List<TenantInfo> Tenants { get; set; } = new List<TenantInfo>();
+}
+
+public class CreateTenantRequest
+{
+    public string Name { get; set; } = "";
+    public string Code { get; set; } = "";
+    public string OwnerName { get; set; } = "";
+    public string OwnerPhone { get; set; } = "";
+    public string? Email { get; set; }
+    public string? Village { get; set; }
+    public string Plan { get; set; } = "Enterprise SaaS";
+    public string ActiveStatus { get; set; } = "ACTIVE";
 }
