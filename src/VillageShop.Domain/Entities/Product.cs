@@ -29,4 +29,12 @@ public class Product : BaseTenantEntity
     public decimal MinimumStock { get; set; }
 
     public decimal CurrentStock { get; set; }
+
+    public string? BatchNumber { get; set; }
+
+    public string? RackNumber { get; set; }
+
+    public DateTime? ExpiryDate { get; set; }
+
+    public string? HSNCode { get; set; }
 }
