@@ -422,6 +422,15 @@ public class SettingsController : ControllerBase
                 var loadedBranding = JsonSerializer.Deserialize<MobileTenantConfig>(dbConfig.BrandingJson, JsonOpts)
                     ?? await CreateAndSeedDefaultTenantConfigInDbAsync(tenantId);
 
+                if (string.IsNullOrWhiteSpace(loadedBranding.PrimaryColor)) loadedBranding.PrimaryColor = loadedBranding.PrimaryColorHex;
+                if (string.IsNullOrWhiteSpace(loadedBranding.SecondaryColor)) loadedBranding.SecondaryColor = loadedBranding.SecondaryColorHex;
+                if (string.IsNullOrWhiteSpace(loadedBranding.TextColor)) loadedBranding.TextColor = loadedBranding.TextColorHex;
+                if (string.IsNullOrWhiteSpace(loadedBranding.PageBgColor)) loadedBranding.PageBgColor = loadedBranding.PageBgColorHex;
+                if (string.IsNullOrWhiteSpace(loadedBranding.CardBgColor)) loadedBranding.CardBgColor = loadedBranding.CardBgColorHex;
+                if (string.IsNullOrWhiteSpace(loadedBranding.AmountColor)) loadedBranding.AmountColor = loadedBranding.AmountColorHex;
+                if (string.IsNullOrWhiteSpace(loadedBranding.ButtonBgColor)) loadedBranding.ButtonBgColor = loadedBranding.ButtonBgColorHex;
+                if (string.IsNullOrWhiteSpace(loadedBranding.ButtonTextColor)) loadedBranding.ButtonTextColor = loadedBranding.ButtonTextColorHex;
+
                 if (!string.IsNullOrWhiteSpace(dbConfig.MenuJson))
                 {
                     var loadedMenu = JsonSerializer.Deserialize<List<MenuItemConfig>>(dbConfig.MenuJson, JsonOpts);
