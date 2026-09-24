@@ -233,9 +233,10 @@ public class SettingsController : ControllerBase
     [HttpGet("tenants")]
     public async Task<IActionResult> GetTenants()
     {
-        var dbTenants = await _context.Tenants.Where(t => !t.IsDeleted).ToListAsync();
+        var dbTenants = await _context.Tenants.IgnoreQueryFilters().Where(t => !t.IsDeleted).ToListAsync();
         var tenants = dbTenants.Select(t => new TenantInfo
         {
+            Id = t.ID,
             TenantId = $"TNT-{t.ID:D3}",
             Name = t.TenantName,
             Code = t.TenantCode,
@@ -552,6 +553,7 @@ public class MenuItemConfig
 
 public class TenantInfo
 {
+    public long Id { get; set; }
     public string TenantId { get; set; } = "";
     public string Name { get; set; } = "";
     public string Code { get; set; } = "";
