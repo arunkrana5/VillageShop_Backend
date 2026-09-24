@@ -30,6 +30,7 @@ public class SalesController : ControllerBase
     public async Task<IActionResult> GetSales()
     {
         var sales = await _context.Sales
+            .IgnoreQueryFilters()
             .Include(s => s.Customer)
             .AsNoTracking()
             .Where(s => !s.IsDeleted)

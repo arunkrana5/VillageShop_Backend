@@ -26,6 +26,7 @@ public class CustomersController : ControllerBase
     public async Task<IActionResult> GetCustomers()
     {
         var customers = await _context.Customers
+            .IgnoreQueryFilters()
             .AsNoTracking()
             .Where(c => !c.IsDeleted)
             .OrderByDescending(c => c.ID)
@@ -70,7 +71,7 @@ public class CustomersController : ControllerBase
     [HttpPut("{id}")]
     public async Task<IActionResult> UpdateCustomer(long id, [FromBody] CustomerCreateRequest request)
     {
-        var customer = await _context.Customers.FirstOrDefaultAsync(c => c.ID == id && !c.IsDeleted);
+        var customer = await _context.Customers.IgnoreQueryFilters().FirstOrDefaultAsync(c => c.ID == id && !c.IsDeleted);
         if (customer == null) return NotFound(PostResponse.Error("Customer not found.", 404));
 
         customer.Name = request.Name;
@@ -84,7 +85,7 @@ public class CustomersController : ControllerBase
     [HttpPost("payment")]
     public async Task<IActionResult> RecordPayment([FromBody] CustomerPaymentRequest request)
     {
-        var customer = await _context.Customers.FirstOrDefaultAsync(c => c.Name.ToLower() == request.CustomerName.ToLower() && !c.IsDeleted);
+        var customer = await _context.Customers.IgnoreQueryFilters().FirstOrDefaultAsync(c => c.Name.ToLower() == request.CustomerName.ToLower() && !c.IsDeleted);
         if (customer != null)
         {
             customer.CurrentBalance = (decimal)request.RemainingUdhaar;
@@ -97,7 +98,7 @@ public class CustomersController : ControllerBase
     [HttpDelete("{id}")]
     public async Task<IActionResult> DeleteCustomer(long id)
     {
-        var customer = await _context.Customers.FirstOrDefaultAsync(c => c.ID == id && !c.IsDeleted);
+        var customer = await _context.Customers.IgnoreQueryFilters().FirstOrDefaultAsync(c => c.ID == id && !c.IsDeleted);
         if (customer != null)
         {
             customer.IsDeleted = true;
