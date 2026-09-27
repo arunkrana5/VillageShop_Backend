@@ -23,16 +23,42 @@ public class CustomersController : ControllerBase
     }
 
     [HttpGet]
-    public async Task<IActionResult> GetCustomers()
+    public async Task<IActionResult> GetCustomers([FromQuery] long? tenantId, [FromQuery] string? tenantCode)
     {
-        var customers = await _context.Customers
+        long targetTenantId = tenantId ?? 0;
+        if (targetTenantId <= 0 && !string.IsNullOrWhiteSpace(tenantCode))
+        {
+            var tenant = await _context.Tenants.IgnoreQueryFilters().FirstOrDefaultAsync(t => t.TenantCode.ToLower() == tenantCode.ToLower() && !t.IsDeleted);
+            if (tenant != null) targetTenantId = tenant.ID;
+        }
+
+        if (targetTenantId <= 0 && Request.Headers.TryGetValue("X-Tenant-Id", out var headerTidStr) && long.TryParse(headerTidStr, out var headerTid) && headerTid > 0)
+        {
+            targetTenantId = headerTid;
+        }
+
+        if (targetTenantId <= 0 && Request.Headers.TryGetValue("X-Tenant-Code", out var headerTCode) && !string.IsNullOrWhiteSpace(headerTCode))
+        {
+            var tenant = await _context.Tenants.IgnoreQueryFilters().FirstOrDefaultAsync(t => t.TenantCode.ToLower() == headerTCode.ToString().ToLower() && !t.IsDeleted);
+            if (tenant != null) targetTenantId = tenant.ID;
+        }
+
+        var query = _context.Customers
             .IgnoreQueryFilters()
             .AsNoTracking()
-            .Where(c => !c.IsDeleted)
+            .Where(c => !c.IsDeleted);
+
+        if (targetTenantId > 0)
+        {
+            query = query.Where(c => c.TenantId == targetTenantId || c.TenantId == 1);
+        }
+
+        var customers = await query
             .OrderByDescending(c => c.ID)
             .Select(c => new
             {
                 id = c.ID.ToString(),
+                tenantId = c.TenantId,
                 name = c.Name,
                 phone = c.Mobile ?? "",
                 village = c.Village ?? "Rampur",
@@ -48,24 +74,44 @@ public class CustomersController : ControllerBase
     [HttpPost]
     public async Task<IActionResult> CreateCustomer([FromBody] CustomerCreateRequest request)
     {
-        if (string.IsNullOrWhiteSpace(request.Name))
+        if (request == null || string.IsNullOrWhiteSpace(request.Name))
         {
             return BadRequest(PostResponse.Error("Customer name is required."));
         }
 
+        long targetTenantId = request.TenantId ?? 0;
+        if (targetTenantId <= 0 && !string.IsNullOrWhiteSpace(request.TenantCode))
+        {
+            var tenant = await _context.Tenants.IgnoreQueryFilters().FirstOrDefaultAsync(t => t.TenantCode.ToLower() == request.TenantCode.ToLower() && !t.IsDeleted);
+            if (tenant != null) targetTenantId = tenant.ID;
+        }
+
+        if (targetTenantId <= 0 && Request.Headers.TryGetValue("X-Tenant-Id", out var headerTidStr) && long.TryParse(headerTidStr, out var headerTid) && headerTid > 0)
+        {
+            targetTenantId = headerTid;
+        }
+
+        if (targetTenantId <= 0 && Request.Headers.TryGetValue("X-Tenant-Code", out var headerTCode) && !string.IsNullOrWhiteSpace(headerTCode))
+        {
+            var tenant = await _context.Tenants.IgnoreQueryFilters().FirstOrDefaultAsync(t => t.TenantCode.ToLower() == headerTCode.ToString().ToLower() && !t.IsDeleted);
+            if (tenant != null) targetTenantId = tenant.ID;
+        }
+
+        if (targetTenantId <= 0) targetTenantId = 1;
+
         var customer = new Customer
         {
+            TenantId = targetTenantId,
             Name = request.Name,
             Mobile = request.Phone,
             Village = string.IsNullOrWhiteSpace(request.Village) ? "Rampur" : request.Village,
-            CurrentBalance = 0.00m,
-            TenantId = 1
+            CurrentBalance = 0.00m
         };
 
         _context.Customers.Add(customer);
         await _context.SaveChangesAsync();
 
-        return Ok(PostResponse.Success($"Customer '{request.Name}' saved successfully.", customer.ID));
+        return Ok(PostResponse.Success($"Customer '{request.Name}' saved successfully under Tenant #{targetTenantId}.", customer.ID));
     }
 
     [HttpPut("{id}")]
@@ -111,6 +157,8 @@ public class CustomersController : ControllerBase
 
 public class CustomerCreateRequest
 {
+    public long? TenantId { get; set; }
+    public string? TenantCode { get; set; }
     public string Name { get; set; } = string.Empty;
     public string Phone { get; set; } = string.Empty;
     public string Village { get; set; } = string.Empty;
