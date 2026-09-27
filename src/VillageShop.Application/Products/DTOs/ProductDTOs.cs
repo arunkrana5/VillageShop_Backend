@@ -39,6 +39,8 @@ public class CreateProductRequest
     public DateTime? ExpiryDate { get; set; }
 
     public string? HSNCode { get; set; }
+
+    public string? ImageUrl { get; set; }
 }
 
 public class UpdateProductRequest : CreateProductRequest

@@ -54,7 +54,8 @@ public class ProductService : IProductService
             BatchNumber = request.BatchNumber,
             RackNumber = request.RackNumber,
             ExpiryDate = request.ExpiryDate,
-            HSNCode = request.HSNCode
+            HSNCode = request.HSNCode,
+            ImageUrl = request.ImageUrl
         };
 
         _context.Products.Add(product);
@@ -87,6 +88,7 @@ public class ProductService : IProductService
         product.RackNumber = request.RackNumber;
         product.ExpiryDate = request.ExpiryDate;
         product.HSNCode = request.HSNCode;
+        product.ImageUrl = request.ImageUrl;
 
         await _context.SaveChangesAsync();
         return PostResponse.Success($"Product '{product.Name}' updated successfully.", product.ID);
