@@ -57,6 +57,10 @@ public class CreateSaleItemRequest
 
 public class CreateSaleRequest
 {
+    public long? TenantId { get; set; }
+
+    public string? TenantCode { get; set; }
+
     public string ClientTransactionId { get; set; } = string.Empty;
 
     public long? CustomerId { get; set; }

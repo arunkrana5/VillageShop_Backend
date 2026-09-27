@@ -40,7 +40,15 @@ public class SaleService : ISaleService
         var clientTxId = string.IsNullOrWhiteSpace(request.ClientTransactionId) ? Guid.NewGuid().ToString() : request.ClientTransactionId;
         var invoiceNumber = $"INV-{DateTime.UtcNow:yyyyMMdd}-{Guid.NewGuid().ToString()[..6].ToUpper()}";
 
-        // 2. Resolve Customer by ID or Name
+        // 2. Resolve Tenant ID dynamically
+        long targetTenantId = request.TenantId ?? 0;
+        if (targetTenantId <= 0 && !string.IsNullOrWhiteSpace(request.TenantCode))
+        {
+            var tenant = await _context.Tenants.IgnoreQueryFilters().FirstOrDefaultAsync(t => t.TenantCode.ToLower() == request.TenantCode.ToLower() && !t.IsDeleted);
+            if (tenant != null) targetTenantId = tenant.ID;
+        }
+
+        // 3. Resolve Customer by ID or Name
         Customer? targetCustomer = null;
         if (request.CustomerId.HasValue && request.CustomerId.Value > 0)
         {
@@ -49,18 +57,25 @@ public class SaleService : ISaleService
         if (targetCustomer == null && !string.IsNullOrWhiteSpace(request.CustomerName) && request.CustomerName.ToLower() != "walk-in customer")
         {
             targetCustomer = await _context.Customers.IgnoreQueryFilters().FirstOrDefaultAsync(c => c.Name.ToLower() == request.CustomerName.ToLower() && !c.IsDeleted);
-            if (targetCustomer == null)
+        }
+
+        if (targetTenantId <= 0 && targetCustomer != null && targetCustomer.TenantId > 0)
+        {
+            targetTenantId = targetCustomer.TenantId;
+        }
+        if (targetTenantId <= 0) targetTenantId = 1;
+
+        if (targetCustomer == null && !string.IsNullOrWhiteSpace(request.CustomerName) && request.CustomerName.ToLower() != "walk-in customer")
+        {
+            targetCustomer = new Customer
             {
-                targetCustomer = new Customer
-                {
-                    TenantId = 1,
-                    Name = request.CustomerName,
-                    Mobile = "",
-                    CurrentBalance = 0
-                };
-                _context.Customers.Add(targetCustomer);
-                await _context.SaveChangesAsync();
-            }
+                TenantId = targetTenantId,
+                Name = request.CustomerName,
+                Mobile = "",
+                CurrentBalance = 0
+            };
+            _context.Customers.Add(targetCustomer);
+            await _context.SaveChangesAsync();
         }
 
         decimal subTotal = 0;
@@ -127,7 +142,7 @@ public class SaleService : ISaleService
 
         var sale = new Sale
         {
-            TenantId = targetCustomer?.TenantId ?? 1,
+            TenantId = targetTenantId,
             InvoiceNumber = invoiceNumber,
             ClientTransactionId = clientTxId,
             CustomerId = targetCustomer?.ID,
@@ -152,7 +167,7 @@ public class SaleService : ISaleService
 
             var udhaarLedger = new UdhaarLedger
             {
-                TenantId = targetCustomer.TenantId,
+                TenantId = targetTenantId,
                 CustomerId = targetCustomer.ID,
                 TransactionDate = DateTime.UtcNow,
                 TransactionType = "CREDIT_SALE",
