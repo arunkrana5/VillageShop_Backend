@@ -59,7 +59,7 @@ public class SaleService : ISaleService
             targetCustomer = await _context.Customers.IgnoreQueryFilters().FirstOrDefaultAsync(c => c.Name.ToLower() == request.CustomerName.ToLower() && !c.IsDeleted);
         }
 
-        if (targetTenantId <= 0 && targetCustomer != null && targetCustomer.TenantId > 0)
+        if ((targetTenantId <= 0 || targetTenantId == 1) && targetCustomer != null && targetCustomer.TenantId > 0)
         {
             targetTenantId = targetCustomer.TenantId;
         }
