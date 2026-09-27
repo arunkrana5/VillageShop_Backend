@@ -1,3 +1,4 @@
+using System.ComponentModel.DataAnnotations.Schema;
 using VillageShop.Domain.Common;
 
 namespace VillageShop.Domain.Entities;
@@ -38,5 +39,6 @@ public class Product : BaseTenantEntity
 
     public string? HSNCode { get; set; }
 
+    [NotMapped]
     public string? ImageUrl { get; set; }
 }
