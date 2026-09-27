@@ -63,6 +63,21 @@ public class SaleService : ISaleService
         {
             targetTenantId = targetCustomer.TenantId;
         }
+
+        if (targetTenantId <= 0 || targetTenantId == 1)
+        {
+            var firstItem = request.Items.FirstOrDefault();
+            if (firstItem != null)
+            {
+                long pid = firstItem.ProductId > 0 ? firstItem.ProductId : firstItem.Id;
+                if (pid > 0)
+                {
+                    var p = await _context.Products.IgnoreQueryFilters().FirstOrDefaultAsync(x => x.ID == pid && !x.IsDeleted);
+                    if (p != null && p.TenantId > 0) targetTenantId = p.TenantId;
+                }
+            }
+        }
+
         if (targetTenantId <= 0) targetTenantId = 1;
 
         if (targetCustomer == null && !string.IsNullOrWhiteSpace(request.CustomerName) && request.CustomerName.ToLower() != "walk-in customer")
@@ -117,6 +132,7 @@ public class SaleService : ISaleService
 
             saleItems.Add(new SaleItem
             {
+                TenantId = targetTenantId,
                 ProductId = targetPid > 0 ? targetPid : 1,
                 ProductName = targetPName,
                 Quantity = itemQty,

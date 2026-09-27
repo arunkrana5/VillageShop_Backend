@@ -56,7 +56,7 @@ public class SalesController : ControllerBase
 
         if (targetTenantId > 0)
         {
-            query = query.Where(s => s.TenantId == targetTenantId || s.TenantId == 1);
+            query = query.Where(s => s.TenantId == targetTenantId);
         }
 
         var sales = await query
