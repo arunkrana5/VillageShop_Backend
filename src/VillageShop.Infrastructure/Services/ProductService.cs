@@ -37,6 +37,7 @@ public class ProductService : IProductService
 
         var product = new Product
         {
+            ItemId = request.ItemId,
             TenantId = targetTenantId,
             ProductCode = string.IsNullOrWhiteSpace(request.ProductCode) ? $"PRD-{Guid.NewGuid().ToString()[..6].ToUpper()}" : request.ProductCode,
             Name = request.Name,
@@ -72,6 +73,7 @@ public class ProductService : IProductService
             return PostResponse.Error("Product not found.", 404);
         }
 
+        product.ItemId = request.ItemId;
         product.Name = request.Name;
         product.Category = request.Category;
         product.Brand = request.Brand;

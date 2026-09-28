@@ -93,6 +93,8 @@ using (var scope = app.Services.CreateScope())
     {
         var db = scope.ServiceProvider.GetRequiredService<ApplicationDbContext>();
         try { db.Database.EnsureCreated(); } catch (Exception) {}
+        try { db.Database.ExecuteSqlRaw("IF NOT EXISTS (SELECT * FROM sys.columns WHERE object_id = OBJECT_ID('V_Products') AND name = 'ImageUrl') ALTER TABLE V_Products ADD ImageUrl NVARCHAR(MAX) NULL;"); } catch (Exception) {}
+        try { db.Database.ExecuteSqlRaw("IF NOT EXISTS (SELECT * FROM sys.columns WHERE object_id = OBJECT_ID('V_Products') AND name = 'ItemId') ALTER TABLE V_Products ADD ItemId BIGINT NULL;"); } catch (Exception) {}
 
         // Ensure All 4 SaaS Client Tenants & Dedicated User Accounts exist in DB
         var targetClients = new[]

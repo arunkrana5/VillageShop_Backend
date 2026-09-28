@@ -2,6 +2,8 @@ namespace VillageShop.Application.Products.DTOs;
 
 public class CreateProductRequest
 {
+    public long? ItemId { get; set; }
+
     public long? TenantId { get; set; }
 
     public string? TenantCode { get; set; }
