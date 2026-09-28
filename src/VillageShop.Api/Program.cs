@@ -9,7 +9,7 @@ using VillageShop.Api.Middleware;
 using VillageShop.Application.Auth.Services;
 using VillageShop.Application.Common.Interfaces;
 using VillageShop.Application.Items.Services;
-using VillageShop.Application.Products.Services;
+using VillageShop.Application.StockIn.Services;
 using VillageShop.Application.Sales.Services;
 using VillageShop.Domain.Entities;
 using VillageShop.Infrastructure.Dapper;
@@ -49,7 +49,7 @@ builder.Services.AddScoped<IJwtTokenGenerator, JwtTokenGenerator>();
 // Application Services DI
 builder.Services.AddScoped<IAuthService, AuthService>();
 builder.Services.AddScoped<IItemService, ItemService>();
-builder.Services.AddScoped<IProductService, ProductService>();
+builder.Services.AddScoped<IStockInService, StockInService>();
 builder.Services.AddScoped<ISaleService, SaleService>();
 
 // JWT Authentication Configuration

@@ -1,6 +1,8 @@
-namespace VillageShop.Application.Products.DTOs;
+using System;
 
-public class CreateProductRequest
+namespace VillageShop.Application.StockIn.DTOs;
+
+public class CreateStockInRequest
 {
     public long? ItemId { get; set; }
 
@@ -45,12 +47,12 @@ public class CreateProductRequest
     public string? ImageUrl { get; set; }
 }
 
-public class UpdateProductRequest : CreateProductRequest
+public class UpdateStockInRequest : CreateStockInRequest
 {
     public long ID { get; set; }
 }
 
-public class ProductSearchRequest
+public class StockInSearchRequest
 {
     public long? TenantId { get; set; }
 

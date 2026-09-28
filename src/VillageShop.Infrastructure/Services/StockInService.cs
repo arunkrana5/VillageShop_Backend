@@ -4,27 +4,27 @@ using System.Linq;
 using System.Threading.Tasks;
 using Microsoft.EntityFrameworkCore;
 using VillageShop.Application.Common.Interfaces;
-using VillageShop.Application.Products.DTOs;
-using VillageShop.Application.Products.Services;
+using VillageShop.Application.StockIn.DTOs;
+using VillageShop.Application.StockIn.Services;
 using VillageShop.Common.Models;
 using VillageShop.Domain.Entities;
 
 namespace VillageShop.Infrastructure.Services;
 
-public class ProductService : IProductService
+public class StockInService : IStockInService
 {
     private readonly IApplicationDbContext _context;
 
-    public ProductService(IApplicationDbContext context)
+    public StockInService(IApplicationDbContext context)
     {
         _context = context;
     }
 
-    public async Task<PostResponse> CreateAsync(CreateProductRequest request)
+    public async Task<PostResponse> CreateAsync(CreateStockInRequest request)
     {
         if (string.IsNullOrWhiteSpace(request.Name))
         {
-            return PostResponse.Error("Product name is required.", 400);
+            return PostResponse.Error("Product / Item name is required.", 400);
         }
 
         long targetTenantId = request.TenantId ?? 0;
@@ -62,15 +62,15 @@ public class ProductService : IProductService
         _context.Products.Add(product);
         await _context.SaveChangesAsync();
 
-        return PostResponse.Success($"Product '{product.Name}' created successfully.", product.ID);
+        return PostResponse.Success($"Stock In entry '{product.Name}' created successfully.", product.ID);
     }
 
-    public async Task<PostResponse> UpdateAsync(UpdateProductRequest request)
+    public async Task<PostResponse> UpdateAsync(UpdateStockInRequest request)
     {
         var product = await _context.Products.IgnoreQueryFilters().FirstOrDefaultAsync(p => p.ID == request.ID && !p.IsDeleted);
         if (product == null)
         {
-            return PostResponse.Error("Product not found.", 404);
+            return PostResponse.Error("Stock item not found.", 404);
         }
 
         product.ItemId = request.ItemId;
@@ -93,7 +93,7 @@ public class ProductService : IProductService
         product.ImageUrl = request.ImageUrl;
 
         await _context.SaveChangesAsync();
-        return PostResponse.Success($"Product '{product.Name}' updated successfully.", product.ID);
+        return PostResponse.Success($"Stock item '{product.Name}' updated successfully.", product.ID);
     }
 
     public async Task<PostResponse> DeleteAsync(long id)
@@ -101,14 +101,14 @@ public class ProductService : IProductService
         var product = await _context.Products.IgnoreQueryFilters().FirstOrDefaultAsync(p => p.ID == id && !p.IsDeleted);
         if (product == null)
         {
-            return PostResponse.Error("Product not found.", 404);
+            return PostResponse.Error("Stock item not found.", 404);
         }
 
         product.IsDeleted = true;
         product.DeletedDate = DateTime.UtcNow;
         await _context.SaveChangesAsync();
 
-        return PostResponse.Success("Product deleted successfully.", id);
+        return PostResponse.Success("Stock item deleted successfully.", id);
     }
 
     public async Task<Product?> GetByIdAsync(long id)
@@ -116,7 +116,7 @@ public class ProductService : IProductService
         return await _context.Products.IgnoreQueryFilters().FirstOrDefaultAsync(p => p.ID == id && !p.IsDeleted);
     }
 
-    public async Task<IEnumerable<Product>> SearchAsync(ProductSearchRequest request)
+    public async Task<IEnumerable<Product>> SearchAsync(StockInSearchRequest request)
     {
         var pageNumber = request.PageNumber <= 0 ? 1 : request.PageNumber;
         var pageSize = request.PageSize <= 0 ? 200 : request.PageSize;
