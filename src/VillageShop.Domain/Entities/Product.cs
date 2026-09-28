@@ -5,7 +5,7 @@ namespace VillageShop.Domain.Entities;
 
 public class Product : BaseTenantEntity
 {
-    public long? ItemMasterId { get; set; }
+    public long? ItemId { get; set; }
 
     public string ProductCode { get; set; } = string.Empty;
 

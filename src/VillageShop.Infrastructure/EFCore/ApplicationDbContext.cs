@@ -25,7 +25,7 @@ public class ApplicationDbContext : DbContext, IApplicationDbContext
     public DbSet<RolePermission> RolePermissions => Set<RolePermission>();
     public DbSet<TenantConfiguration> TenantConfigurations => Set<TenantConfiguration>();
     public DbSet<AuditLog> AuditLogs => Set<AuditLog>();
-    public DbSet<ItemMaster> ItemMasters => Set<ItemMaster>();
+    public DbSet<Item> Items => Set<Item>();
     public DbSet<Product> Products => Set<Product>();
     public DbSet<Customer> Customers => Set<Customer>();
     public DbSet<Supplier> Suppliers => Set<Supplier>();
@@ -139,7 +139,7 @@ public class ApplicationDbContext : DbContext, IApplicationDbContext
         modelBuilder.Entity<Role>().HasQueryFilter(e => IsSuperAdmin || e.TenantId == CurrentTenantId);
         modelBuilder.Entity<TenantConfiguration>().HasQueryFilter(e => IsSuperAdmin || e.TenantId == CurrentTenantId);
         modelBuilder.Entity<AuditLog>().HasQueryFilter(e => IsSuperAdmin || e.TenantId == CurrentTenantId);
-        modelBuilder.Entity<ItemMaster>().HasQueryFilter(e => IsSuperAdmin || e.TenantId == CurrentTenantId);
+        modelBuilder.Entity<Item>().HasQueryFilter(e => IsSuperAdmin || e.TenantId == CurrentTenantId);
         modelBuilder.Entity<Product>().HasQueryFilter(e => IsSuperAdmin || e.TenantId == CurrentTenantId);
         modelBuilder.Entity<Customer>().HasQueryFilter(e => IsSuperAdmin || e.TenantId == CurrentTenantId);
         modelBuilder.Entity<Supplier>().HasQueryFilter(e => IsSuperAdmin || e.TenantId == CurrentTenantId);

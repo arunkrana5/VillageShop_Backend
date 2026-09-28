@@ -2,7 +2,7 @@ using VillageShop.Domain.Common;
 
 namespace VillageShop.Domain.Entities;
 
-public class ItemMaster : BaseTenantEntity
+public class Item : BaseTenantEntity
 {
     public string ItemCode { get; set; } = string.Empty;
 

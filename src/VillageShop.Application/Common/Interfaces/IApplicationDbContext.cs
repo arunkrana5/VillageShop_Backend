@@ -14,7 +14,7 @@ public interface IApplicationDbContext
     DbSet<RolePermission> RolePermissions { get; }
     DbSet<TenantConfiguration> TenantConfigurations { get; }
     DbSet<AuditLog> AuditLogs { get; }
-    DbSet<ItemMaster> ItemMasters { get; }
+    DbSet<Item> Items { get; }
     DbSet<Product> Products { get; }
     DbSet<Customer> Customers { get; }
     DbSet<Supplier> Suppliers { get; }

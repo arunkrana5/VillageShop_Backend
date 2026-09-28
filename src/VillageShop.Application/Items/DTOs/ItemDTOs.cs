@@ -1,6 +1,6 @@
-namespace VillageShop.Application.ItemMasters.DTOs;
+namespace VillageShop.Application.Items.DTOs;
 
-public class CreateItemMasterRequest
+public class CreateItemRequest
 {
     public long? TenantId { get; set; }
     public string? TenantCode { get; set; }
@@ -12,7 +12,7 @@ public class CreateItemMasterRequest
     public string? Description { get; set; }
 }
 
-public class UpdateItemMasterRequest
+public class UpdateItemRequest
 {
     public long ID { get; set; }
     public long? TenantId { get; set; }
@@ -25,7 +25,7 @@ public class UpdateItemMasterRequest
     public string? Description { get; set; }
 }
 
-public class ItemMasterSearchRequest
+public class ItemSearchRequest
 {
     public long? TenantId { get; set; }
     public string? TenantCode { get; set; }

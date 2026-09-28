@@ -8,7 +8,7 @@ using Microsoft.IdentityModel.Tokens;
 using VillageShop.Api.Middleware;
 using VillageShop.Application.Auth.Services;
 using VillageShop.Application.Common.Interfaces;
-using VillageShop.Application.ItemMasters.Services;
+using VillageShop.Application.Items.Services;
 using VillageShop.Application.Products.Services;
 using VillageShop.Application.Sales.Services;
 using VillageShop.Domain.Entities;
@@ -48,7 +48,7 @@ builder.Services.AddScoped<IJwtTokenGenerator, JwtTokenGenerator>();
 
 // Application Services DI
 builder.Services.AddScoped<IAuthService, AuthService>();
-builder.Services.AddScoped<IItemMasterService, ItemMasterService>();
+builder.Services.AddScoped<IItemService, ItemService>();
 builder.Services.AddScoped<IProductService, ProductService>();
 builder.Services.AddScoped<ISaleService, SaleService>();
 
@@ -165,16 +165,16 @@ using (var scope = app.Services.CreateScope())
             }
         }
 
-        // Seed initial Item Masters if empty
-        if (!db.ItemMasters.Any(i => !i.IsDeleted))
+        // Seed initial Items if empty
+        if (!db.Items.Any(i => !i.IsDeleted))
         {
-            db.ItemMasters.AddRange(
-                new ItemMaster { ItemCode = "ITM-1001", Name = "Aashirvaad Atta 5kg", Category = "Groceries", Unit = "pkt", Format = "Packed", Description = "Whole Wheat Atta 5kg Packet", TenantId = 1 },
-                new ItemMaster { ItemCode = "ITM-1002", Name = "Fortune Mustard Oil 1L", Category = "Edible Oil", Unit = "bottle", Format = "Packed", Description = "Mustard Oil 1L Bottle", TenantId = 1 },
-                new ItemMaster { ItemCode = "ITM-1003", Name = "Tata Salt 1kg", Category = "Groceries", Unit = "pkt", Format = "Packed", Description = "Iodized Salt 1kg Packet", TenantId = 1 },
-                new ItemMaster { ItemCode = "ITM-1004", Name = "Surf Excel 1kg", Category = "Detergent", Unit = "pkt", Format = "Packed", Description = "Detergent Powder 1kg Packet", TenantId = 1 },
-                new ItemMaster { ItemCode = "ITM-1005", Name = "Loose Sugar (चीनी)", Category = "Groceries", Unit = "kg", Format = "Loose", Description = "Refined White Sugar per kg", TenantId = 1 },
-                new ItemMaster { ItemCode = "ITM-1006", Name = "Toor Dal (अरहर दाल)", Category = "Groceries", Unit = "kg", Format = "Loose", Description = "Unpolished Toor Dal per kg", TenantId = 1 }
+            db.Items.AddRange(
+                new Item { ItemCode = "ITM-1001", Name = "Aashirvaad Atta 5kg", Category = "Groceries", Unit = "pkt", Format = "Packed", Description = "Whole Wheat Atta 5kg Packet", TenantId = 1 },
+                new Item { ItemCode = "ITM-1002", Name = "Fortune Mustard Oil 1L", Category = "Edible Oil", Unit = "bottle", Format = "Packed", Description = "Mustard Oil 1L Bottle", TenantId = 1 },
+                new Item { ItemCode = "ITM-1003", Name = "Tata Salt 1kg", Category = "Groceries", Unit = "pkt", Format = "Packed", Description = "Iodized Salt 1kg Packet", TenantId = 1 },
+                new Item { ItemCode = "ITM-1004", Name = "Surf Excel 1kg", Category = "Detergent", Unit = "pkt", Format = "Packed", Description = "Detergent Powder 1kg Packet", TenantId = 1 },
+                new Item { ItemCode = "ITM-1005", Name = "Loose Sugar (चीनी)", Category = "Groceries", Unit = "kg", Format = "Loose", Description = "Refined White Sugar per kg", TenantId = 1 },
+                new Item { ItemCode = "ITM-1006", Name = "Toor Dal (अरहर दाल)", Category = "Groceries", Unit = "kg", Format = "Loose", Description = "Unpolished Toor Dal per kg", TenantId = 1 }
             );
             try { db.SaveChanges(); } catch (Exception) {}
         }
