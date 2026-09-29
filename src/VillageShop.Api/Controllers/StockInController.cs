@@ -12,12 +12,15 @@ namespace VillageShop.Api.Controllers;
 [ApiController]
 [AllowAnonymous]
 [Route("api/[controller]")]
+[Route("api/stock")]
+[Route("api/stockin")]
+[Route("api/stock-in")]
 [Route("api/products")]
-public class StockInController : ControllerBase
+public class StockController : ControllerBase
 {
     private readonly IStockInService _stockInService;
 
-    public StockInController(IStockInService stockInService)
+    public StockController(IStockInService stockInService)
     {
         _stockInService = stockInService;
     }

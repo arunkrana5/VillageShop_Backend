@@ -93,8 +93,22 @@ using (var scope = app.Services.CreateScope())
     {
         var db = scope.ServiceProvider.GetRequiredService<ApplicationDbContext>();
         try { db.Database.EnsureCreated(); } catch (Exception) {}
-        try { db.Database.ExecuteSqlRaw("IF NOT EXISTS (SELECT * FROM sys.columns WHERE object_id = OBJECT_ID('V_Products') AND name = 'ImageUrl') ALTER TABLE V_Products ADD ImageUrl NVARCHAR(MAX) NULL;"); } catch (Exception) {}
-        try { db.Database.ExecuteSqlRaw("IF NOT EXISTS (SELECT * FROM sys.columns WHERE object_id = OBJECT_ID('V_Products') AND name = 'ItemId') ALTER TABLE V_Products ADD ItemId BIGINT NULL;"); } catch (Exception) {}
+        try { db.Database.ExecuteSqlRaw("IF EXISTS (SELECT * FROM sys.tables WHERE name = 'V_Products') AND NOT EXISTS (SELECT * FROM sys.tables WHERE name = 'V_Stock') EXEC sp_rename 'V_Products', 'V_Stock';"); } catch (Exception) {}
+        try { db.Database.ExecuteSqlRaw("IF NOT EXISTS (SELECT * FROM sys.columns WHERE object_id = OBJECT_ID('V_Stock') AND name = 'ImageUrl') ALTER TABLE V_Stock ADD ImageUrl NVARCHAR(MAX) NULL;"); } catch (Exception) {}
+        try { db.Database.ExecuteSqlRaw("IF NOT EXISTS (SELECT * FROM sys.columns WHERE object_id = OBJECT_ID('V_Stock') AND name = 'ItemId') ALTER TABLE V_Stock ADD ItemId BIGINT NULL;"); } catch (Exception) {}
+
+        // Clear all dummy/test records from DB for clean real-time testing
+        try {
+            db.Database.ExecuteSqlRaw(@"
+                DELETE FROM V_SaleItems;
+                DELETE FROM V_Sales;
+                DELETE FROM V_UdhaarLedgers;
+                IF EXISTS (SELECT * FROM sys.tables WHERE name = 'V_Stock') DELETE FROM V_Stock;
+                IF EXISTS (SELECT * FROM sys.tables WHERE name = 'V_Products') DELETE FROM V_Products;
+                DELETE FROM V_Items;
+                DELETE FROM V_Customers;
+            ");
+        } catch (Exception) {}
 
         // Ensure All 4 SaaS Client Tenants & Dedicated User Accounts exist in DB
         var targetClients = new[]
@@ -165,45 +179,6 @@ using (var scope = app.Services.CreateScope())
                 });
                 try { db.SaveChanges(); } catch (Exception) {}
             }
-        }
-
-        // Seed initial Items if empty
-        if (!db.Items.Any(i => !i.IsDeleted))
-        {
-            db.Items.AddRange(
-                new Item { ItemCode = "ITM-1001", Name = "Aashirvaad Atta 5kg", Category = "Groceries", Unit = "pkt", Format = "Packed", Description = "Whole Wheat Atta 5kg Packet", TenantId = 1 },
-                new Item { ItemCode = "ITM-1002", Name = "Fortune Mustard Oil 1L", Category = "Edible Oil", Unit = "bottle", Format = "Packed", Description = "Mustard Oil 1L Bottle", TenantId = 1 },
-                new Item { ItemCode = "ITM-1003", Name = "Tata Salt 1kg", Category = "Groceries", Unit = "pkt", Format = "Packed", Description = "Iodized Salt 1kg Packet", TenantId = 1 },
-                new Item { ItemCode = "ITM-1004", Name = "Surf Excel 1kg", Category = "Detergent", Unit = "pkt", Format = "Packed", Description = "Detergent Powder 1kg Packet", TenantId = 1 },
-                new Item { ItemCode = "ITM-1005", Name = "Loose Sugar (चीनी)", Category = "Groceries", Unit = "kg", Format = "Loose", Description = "Refined White Sugar per kg", TenantId = 1 },
-                new Item { ItemCode = "ITM-1006", Name = "Toor Dal (अरहर दाल)", Category = "Groceries", Unit = "kg", Format = "Loose", Description = "Unpolished Toor Dal per kg", TenantId = 1 }
-            );
-            try { db.SaveChanges(); } catch (Exception) {}
-        }
-
-        // Seed initial products if empty
-        if (!db.Products.Any(p => !p.IsDeleted))
-        {
-            db.Products.AddRange(
-                new Product { ProductCode = "PRD-001", Name = "Aashirvaad Atta 5kg", Category = "Groceries", Unit = "pkt", PurchasePrice = 195.00m, SellingPrice = 220.00m, MRP = 240.00m, OpeningStock = 15, CurrentStock = 15, TenantId = 1 },
-                new Product { ProductCode = "PRD-002", Name = "Fortune Mustard Oil 1L", Category = "Edible Oil", Unit = "bottle", PurchasePrice = 130.00m, SellingPrice = 145.00m, MRP = 160.00m, OpeningStock = 8, CurrentStock = 8, TenantId = 1 },
-                new Product { ProductCode = "PRD-003", Name = "Tata Salt 1kg", Category = "Groceries", Unit = "pkt", PurchasePrice = 22.00m, SellingPrice = 28.00m, MRP = 30.00m, OpeningStock = 40, CurrentStock = 40, TenantId = 1 },
-                new Product { ProductCode = "PRD-004", Name = "Surf Excel 1kg", Category = "Detergent", Unit = "pkt", PurchasePrice = 110.00m, SellingPrice = 130.00m, MRP = 140.00m, OpeningStock = 12, CurrentStock = 12, TenantId = 1 },
-                new Product { ProductCode = "PRD-005", Name = "Sugar (चीनी) 1kg", Category = "Groceries", Unit = "kg", PurchasePrice = 38.00m, SellingPrice = 42.00m, MRP = 45.00m, OpeningStock = 50, CurrentStock = 50, TenantId = 1 }
-            );
-            db.SaveChanges();
-        }
-
-        // Seed initial customers if empty
-        if (!db.Customers.Any(c => !c.IsDeleted))
-        {
-            db.Customers.AddRange(
-                new Customer { Name = "Ramesh Kumar", Mobile = "+91 98765 43210", Village = "Rampur", CurrentBalance = 2400.00m, TenantId = 1 },
-                new Customer { Name = "Suresh Patel", Mobile = "+91 98123 45678", Village = "Rampur", CurrentBalance = 1200.00m, TenantId = 1 },
-                new Customer { Name = "Anita Sharma", Mobile = "+91 97654 32109", Village = "Meerut", CurrentBalance = 0.00m, TenantId = 1 },
-                new Customer { Name = "Vikas Verma", Mobile = "+91 99887 76655", Village = "Kisan Nagar", CurrentBalance = 880.00m, TenantId = 1 }
-            );
-            db.SaveChanges();
         }
     }
     catch (Exception ex)

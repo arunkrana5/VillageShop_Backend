@@ -1,7 +1,9 @@
+using System.ComponentModel.DataAnnotations.Schema;
 using VillageShop.Domain.Common;
 
 namespace VillageShop.Domain.Entities;
 
+[Table("V_Stock")]
 public class Product : BaseTenantEntity
 {
     public long? ItemId { get; set; }
