@@ -165,75 +165,54 @@ using (var scope = app.Services.CreateScope())
         try { db.Database.ExecuteSqlRaw("IF NOT EXISTS (SELECT * FROM sys.columns WHERE object_id = OBJECT_ID('V_Stock') AND name = 'HSNCode') ALTER TABLE V_Stock ADD HSNCode NVARCHAR(50) NULL;"); } catch (Exception) {}
 
 
-        // Ensure All 4 SaaS Client Tenants & Dedicated User Accounts exist in DB
-        var targetClients = new[]
+        // Ensure ONLY SuperAdmin Default Tenant & System Administrator Account exist in DB
+        var superAdminTenant = db.Tenants.FirstOrDefault(t => t.ID == 1 || t.TenantCode == "SUPERADMIN");
+        if (superAdminTenant == null)
         {
-            new { Id = 1L, Code = "SHARMA_SHOP", Name = "Sharma General Store", Owner = "Rajesh Sharma", Phone = "+91 98765 43210", User = "admin", Pass = "admin123" },
-            new { Id = 2L, Code = "GUPTA_KIRANA", Name = "Gupta Kirana & Provisions", Owner = "Suresh Gupta", Phone = "+91 98123 45678", User = "gupta_admin", Pass = "gupta123" },
-            new { Id = 3L, Code = "VERMA_TRADERS", Name = "Verma Traders & Seeds", Owner = "Vikas Verma", Phone = "+91 97654 32109", User = "verma_admin", Pass = "verma123" },
-            new { Id = 4L, Code = "KISAN_AGRO", Name = "Kisan Agro Store", Owner = "Ramesh Kisan", Phone = "+91 99000 11223", User = "kisan_admin", Pass = "kisan123" }
-        };
+            superAdminTenant = new Tenant
+            {
+                TenantCode = "SUPERADMIN",
+                TenantName = "SuperAdmin Portal",
+                OwnerName = "Super Admin",
+                Mobile = "+91 99999 99999",
+                Village = "Headquarters",
+                IsActive = true,
+                IsDeleted = false
+            };
+            db.Tenants.Add(superAdminTenant);
+            try { db.SaveChanges(); } catch (Exception) {}
+        }
 
-        foreach (var c in targetClients)
+        var superAdminRole = db.Roles.FirstOrDefault(r => r.TenantId == superAdminTenant.ID);
+        if (superAdminRole == null)
         {
-            var existingTenant = db.Tenants.FirstOrDefault(t => t.ID == c.Id || t.TenantCode == c.Code);
-            if (existingTenant == null)
+            superAdminRole = new Role
             {
-                existingTenant = new Tenant
-                {
-                    TenantCode = c.Code,
-                    TenantName = c.Name,
-                    OwnerName = c.Owner,
-                    Mobile = c.Phone,
-                    Village = "Rampur",
-                    IsActive = true,
-                    IsDeleted = false
-                };
-                db.Tenants.Add(existingTenant);
-                try { db.SaveChanges(); } catch (Exception) {}
-            }
-            else
-            {
-                existingTenant.TenantName = c.Name;
-                existingTenant.TenantCode = c.Code;
-                existingTenant.OwnerName = c.Owner;
-                if (!string.IsNullOrWhiteSpace(c.Phone)) existingTenant.Mobile = c.Phone;
-                try { db.SaveChanges(); } catch (Exception) {}
-            }
+                TenantId = superAdminTenant.ID,
+                RoleName = "SuperAdmin",
+                Description = "System Super Administrator",
+                IsSystemRole = true,
+                IsActive = true
+            };
+            db.Roles.Add(superAdminRole);
+            try { db.SaveChanges(); } catch (Exception) {}
+        }
 
-            var targetTenantId = existingTenant.ID > 0 ? existingTenant.ID : c.Id;
-
-            var existingRole = db.Roles.FirstOrDefault(r => r.TenantId == targetTenantId);
-            if (existingRole == null)
+        var superAdminUser = db.Users.FirstOrDefault(u => u.TenantId == superAdminTenant.ID || u.Username == "admin");
+        if (superAdminUser == null)
+        {
+            db.Users.Add(new User
             {
-                existingRole = new Role
-                {
-                    TenantId = targetTenantId,
-                    RoleName = "Admin",
-                    Description = "Store Administrator",
-                    IsSystemRole = true,
-                    IsActive = true
-                };
-                db.Roles.Add(existingRole);
-                try { db.SaveChanges(); } catch (Exception) {}
-            }
-
-            var existingUser = db.Users.FirstOrDefault(u => u.TenantId == targetTenantId || u.Username == c.User);
-            if (existingUser == null)
-            {
-                db.Users.Add(new User
-                {
-                    TenantId = targetTenantId,
-                    Username = c.User,
-                    FullName = $"{c.Owner} ({c.Name})",
-                    PasswordHash = BCrypt.Net.BCrypt.HashPassword(c.Pass),
-                    RoleId = existingRole.ID > 0 ? existingRole.ID : 1,
-                    Mobile = c.Phone,
-                    IsActive = true,
-                    IsDeleted = false
-                });
-                try { db.SaveChanges(); } catch (Exception) {}
-            }
+                TenantId = superAdminTenant.ID,
+                Username = "admin",
+                FullName = "Super Admin",
+                PasswordHash = BCrypt.Net.BCrypt.HashPassword("admin123"),
+                RoleId = superAdminRole.ID > 0 ? superAdminRole.ID : 1,
+                Mobile = "+91 99999 99999",
+                IsActive = true,
+                IsDeleted = false
+            });
+            try { db.SaveChanges(); } catch (Exception) {}
         }
     }
     catch (Exception ex)
