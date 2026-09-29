@@ -783,6 +783,8 @@ public class SettingsController : ControllerBase
             {
                 new MenuItemConfig { Id = "dashboard", TitleEn = "Dashboard", TitleHi = "डैशबोर्ड", Icon = "dashboard_rounded", Route = "/home", IsEnabled = true },
                 new MenuItemConfig { Id = "pos", TitleEn = "New Sale / POS", TitleHi = "नया बिल / POS", Icon = "point_of_sale_rounded", Route = "/pos", IsEnabled = true, BadgeText = "FAST" },
+                new MenuItemConfig { Id = "items", TitleEn = "Items & Catalog", TitleHi = "सामान (Items)", Icon = "assignment_rounded", Route = "/items", IsEnabled = true },
+                new MenuItemConfig { Id = "stock", TitleEn = "Stock & Inventory", TitleHi = "स्टॉक (Stock)", Icon = "inventory_2_rounded", Route = "/stock", IsEnabled = true },
                 new MenuItemConfig { Id = "customers", TitleEn = "Customer Udhaar", TitleHi = "ग्राहक उधार खाता", Icon = "people_alt_rounded", Route = "/customers", IsEnabled = true },
                 new MenuItemConfig { Id = "reports", TitleEn = "Reports & Earnings", TitleHi = "रिपोर्ट और कमाई", Icon = "analytics_rounded", Route = "/reports", IsEnabled = true },
                 new MenuItemConfig { Id = "settings", TitleEn = "Settings", TitleHi = "सेटिंग्स", Icon = "settings_rounded", Route = "/settings", IsEnabled = true },
