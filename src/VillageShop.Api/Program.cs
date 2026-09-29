@@ -93,9 +93,76 @@ using (var scope = app.Services.CreateScope())
     {
         var db = scope.ServiceProvider.GetRequiredService<ApplicationDbContext>();
         try { db.Database.EnsureCreated(); } catch (Exception) {}
+        try
+        {
+            db.Database.ExecuteSqlRaw(@"
+                IF NOT EXISTS (SELECT * FROM sys.tables WHERE name = 'V_Items')
+                CREATE TABLE V_Items (
+                    ID BIGINT IDENTITY(1,1) PRIMARY KEY,
+                    TenantId BIGINT NOT NULL,
+                    ItemCode NVARCHAR(100) NULL,
+                    Name NVARCHAR(255) NOT NULL,
+                    Category NVARCHAR(100) NULL,
+                    Unit NVARCHAR(50) NULL,
+                    Format NVARCHAR(50) NULL,
+                    Description NVARCHAR(MAX) NULL,
+                    IsActive BIT NOT NULL DEFAULT 1,
+                    IsDeleted BIT NOT NULL DEFAULT 0,
+                    CreatedDate DATETIME2 NOT NULL DEFAULT GETUTCDATE(),
+                    CreatedBy BIGINT NULL,
+                    ModifiedDate DATETIME2 NULL,
+                    ModifiedBy BIGINT NULL,
+                    DeletedDate DATETIME2 NULL,
+                    DeletedBy BIGINT NULL,
+                    IPAddress NVARCHAR(100) NULL,
+                    EntrySource NVARCHAR(100) NULL,
+                    Priority INT NOT NULL DEFAULT 0
+                );
+
+                IF NOT EXISTS (SELECT * FROM sys.tables WHERE name = 'V_Stock')
+                CREATE TABLE V_Stock (
+                    ID BIGINT IDENTITY(1,1) PRIMARY KEY,
+                    TenantId BIGINT NOT NULL,
+                    ItemId BIGINT NULL,
+                    ProductCode NVARCHAR(100) NULL,
+                    Name NVARCHAR(255) NOT NULL,
+                    Category NVARCHAR(100) NULL,
+                    Brand NVARCHAR(100) NULL,
+                    Unit NVARCHAR(50) NULL,
+                    Barcode NVARCHAR(100) NULL,
+                    PurchasePrice DECIMAL(18,2) NOT NULL DEFAULT 0,
+                    SellingPrice DECIMAL(18,2) NOT NULL DEFAULT 0,
+                    MRP DECIMAL(18,2) NOT NULL DEFAULT 0,
+                    GSTPercent DECIMAL(5,2) NOT NULL DEFAULT 0,
+                    OpeningStock DECIMAL(18,3) NOT NULL DEFAULT 0,
+                    MinimumStock DECIMAL(18,3) NOT NULL DEFAULT 5,
+                    CurrentStock DECIMAL(18,3) NOT NULL DEFAULT 0,
+                    BatchNumber NVARCHAR(100) NULL,
+                    RackNumber NVARCHAR(100) NULL,
+                    ExpiryDate DATETIME2 NULL,
+                    HSNCode NVARCHAR(50) NULL,
+                    ImageUrl NVARCHAR(MAX) NULL,
+                    IsActive BIT NOT NULL DEFAULT 1,
+                    IsDeleted BIT NOT NULL DEFAULT 0,
+                    CreatedDate DATETIME2 NOT NULL DEFAULT GETUTCDATE(),
+                    CreatedBy BIGINT NULL,
+                    ModifiedDate DATETIME2 NULL,
+                    ModifiedBy BIGINT NULL,
+                    DeletedDate DATETIME2 NULL,
+                    DeletedBy BIGINT NULL,
+                    IPAddress NVARCHAR(100) NULL,
+                    EntrySource NVARCHAR(100) NULL,
+                    Priority INT NOT NULL DEFAULT 0
+                );
+            ");
+        } catch (Exception) {}
         try { db.Database.ExecuteSqlRaw("IF EXISTS (SELECT * FROM sys.tables WHERE name = 'V_Products') AND NOT EXISTS (SELECT * FROM sys.tables WHERE name = 'V_Stock') EXEC sp_rename 'V_Products', 'V_Stock';"); } catch (Exception) {}
         try { db.Database.ExecuteSqlRaw("IF NOT EXISTS (SELECT * FROM sys.columns WHERE object_id = OBJECT_ID('V_Stock') AND name = 'ImageUrl') ALTER TABLE V_Stock ADD ImageUrl NVARCHAR(MAX) NULL;"); } catch (Exception) {}
         try { db.Database.ExecuteSqlRaw("IF NOT EXISTS (SELECT * FROM sys.columns WHERE object_id = OBJECT_ID('V_Stock') AND name = 'ItemId') ALTER TABLE V_Stock ADD ItemId BIGINT NULL;"); } catch (Exception) {}
+        try { db.Database.ExecuteSqlRaw("IF NOT EXISTS (SELECT * FROM sys.columns WHERE object_id = OBJECT_ID('V_Stock') AND name = 'BatchNumber') ALTER TABLE V_Stock ADD BatchNumber NVARCHAR(100) NULL;"); } catch (Exception) {}
+        try { db.Database.ExecuteSqlRaw("IF NOT EXISTS (SELECT * FROM sys.columns WHERE object_id = OBJECT_ID('V_Stock') AND name = 'RackNumber') ALTER TABLE V_Stock ADD RackNumber NVARCHAR(100) NULL;"); } catch (Exception) {}
+        try { db.Database.ExecuteSqlRaw("IF NOT EXISTS (SELECT * FROM sys.columns WHERE object_id = OBJECT_ID('V_Stock') AND name = 'ExpiryDate') ALTER TABLE V_Stock ADD ExpiryDate DATETIME2 NULL;"); } catch (Exception) {}
+        try { db.Database.ExecuteSqlRaw("IF NOT EXISTS (SELECT * FROM sys.columns WHERE object_id = OBJECT_ID('V_Stock') AND name = 'HSNCode') ALTER TABLE V_Stock ADD HSNCode NVARCHAR(50) NULL;"); } catch (Exception) {}
 
 
         // Ensure All 4 SaaS Client Tenants & Dedicated User Accounts exist in DB
