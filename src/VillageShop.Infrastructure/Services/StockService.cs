@@ -35,7 +35,7 @@ public class StockInService : IStockInService
         }
         if (targetTenantId <= 0) targetTenantId = 1;
 
-        var product = new Product
+        var product = new Stock
         {
             ItemId = request.ItemId,
             TenantId = targetTenantId,
@@ -59,10 +59,10 @@ public class StockInService : IStockInService
             ImageUrl = request.ImageUrl
         };
 
-        _context.Products.Add(product);
+        _context.Stock.Add(product);
         await _context.SaveChangesAsync();
 
-        return PostResponse.Success($"Stock In entry '{product.Name}' created successfully.", product.ID);
+        return PostResponse.Success($"Stock entry '{product.Name}' created successfully.", product.ID);
     }
 
     public async Task<PostResponse> UpdateAsync(UpdateStockInRequest request)
@@ -111,12 +111,12 @@ public class StockInService : IStockInService
         return PostResponse.Success("Stock item deleted successfully.", id);
     }
 
-    public async Task<Product?> GetByIdAsync(long id)
+    public async Task<Stock?> GetByIdAsync(long id)
     {
-        return await _context.Products.IgnoreQueryFilters().FirstOrDefaultAsync(p => p.ID == id && !p.IsDeleted);
+        return await _context.Stock.IgnoreQueryFilters().FirstOrDefaultAsync(p => p.ID == id && !p.IsDeleted);
     }
 
-    public async Task<IEnumerable<Product>> SearchAsync(StockInSearchRequest request)
+    public async Task<IEnumerable<Stock>> SearchAsync(StockInSearchRequest request)
     {
         var pageNumber = request.PageNumber <= 0 ? 1 : request.PageNumber;
         var pageSize = request.PageSize <= 0 ? 200 : request.PageSize;
@@ -128,7 +128,7 @@ public class StockInService : IStockInService
             if (tenant != null) targetTenantId = tenant.ID;
         }
 
-        var query = _context.Products.IgnoreQueryFilters().AsNoTracking().Where(p => !p.IsDeleted);
+        var query = _context.Stock.IgnoreQueryFilters().AsNoTracking().Where(p => !p.IsDeleted);
 
         if (targetTenantId > 0)
         {

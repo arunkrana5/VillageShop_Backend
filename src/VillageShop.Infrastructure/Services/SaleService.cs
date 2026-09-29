@@ -104,14 +104,14 @@ public class SaleService : ISaleService
             decimal itemQty = item.Quantity > 0 ? item.Quantity : (item.Qty > 0 ? item.Qty : 1);
             decimal itemPrice = item.UnitPrice > 0 ? item.UnitPrice : (item.Price > 0 ? item.Price : 0);
 
-            Product? product = null;
+            Stock? product = null;
             if (targetPid > 0)
             {
-                product = await _context.Products.IgnoreQueryFilters().FirstOrDefaultAsync(p => p.ID == targetPid && !p.IsDeleted);
+                product = await _context.Stock.IgnoreQueryFilters().FirstOrDefaultAsync(p => p.ID == targetPid && !p.IsDeleted);
             }
             if (product == null && !string.IsNullOrWhiteSpace(targetPName))
             {
-                product = await _context.Products.IgnoreQueryFilters().FirstOrDefaultAsync(p => p.Name.ToLower() == targetPName.ToLower() && !p.IsDeleted);
+                product = await _context.Stock.IgnoreQueryFilters().FirstOrDefaultAsync(p => p.Name.ToLower() == targetPName.ToLower() && !p.IsDeleted);
             }
 
             if (product != null)

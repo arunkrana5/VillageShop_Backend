@@ -222,7 +222,7 @@ public class SettingsController : ControllerBase
                 newConfig.LowStockThreshold
             };
 
-            var brandingJsonStr = JsonSerializer.Serialize(brandingObj, JsonOpts);
+            var brandingJsonStr = JsonSerializer.Serialize(newConfig, JsonOpts);
             var featureJsonStr = JsonSerializer.Serialize(featureObj, JsonOpts);
             var menuJsonStr = JsonSerializer.Serialize(newConfig.MenuItems, JsonOpts);
 
@@ -436,6 +436,26 @@ public class SettingsController : ControllerBase
                 {
                     var loadedMenu = JsonSerializer.Deserialize<List<MenuItemConfig>>(dbConfig.MenuJson, JsonOpts);
                     if (loadedMenu != null && loadedMenu.Count > 0) loadedBranding.MenuItems = loadedMenu;
+                }
+
+                if (!string.IsNullOrWhiteSpace(dbConfig.FeatureJson))
+                {
+                    try
+                    {
+                        using var doc = JsonDocument.Parse(dbConfig.FeatureJson);
+                        var root = doc.RootElement;
+                        if (root.TryGetProperty("enableUdhaar", out var p1) || root.TryGetProperty("EnableUdhaar", out p1)) loadedBranding.EnableUdhaar = p1.GetBoolean();
+                        if (root.TryGetProperty("enableBarcodeScanner", out var p2) || root.TryGetProperty("EnableBarcodeScanner", out p2)) loadedBranding.EnableBarcodeScanner = p2.GetBoolean();
+                        if (root.TryGetProperty("enableOnlinePayment", out var p3) || root.TryGetProperty("EnableOnlinePayment", out p3)) loadedBranding.EnableOnlinePayment = p3.GetBoolean();
+                        if (root.TryGetProperty("enableHindiLanguage", out var p4) || root.TryGetProperty("EnableHindiLanguage", out p4)) loadedBranding.EnableHindiLanguage = p4.GetBoolean();
+                        if (root.TryGetProperty("enableReceiptPrinting", out var p5) || root.TryGetProperty("EnableReceiptPrinting", out p5)) loadedBranding.EnableReceiptPrinting = p5.GetBoolean();
+                        if (root.TryGetProperty("enablePOSDiscount", out var p6) || root.TryGetProperty("EnablePOSDiscount", out p6)) loadedBranding.EnablePOSDiscount = p6.GetBoolean();
+                        if (root.TryGetProperty("enableTaxCalculation", out var p7) || root.TryGetProperty("EnableTaxCalculation", out p7)) loadedBranding.EnableTaxCalculation = p7.GetBoolean();
+                        if (root.TryGetProperty("defaultTaxPercent", out var p8) || root.TryGetProperty("DefaultTaxPercent", out p8)) loadedBranding.DefaultTaxPercent = p8.GetDouble();
+                        if (root.TryGetProperty("allowNegativeStock", out var p9) || root.TryGetProperty("AllowNegativeStock", out p9)) loadedBranding.AllowNegativeStock = p9.GetBoolean();
+                        if (root.TryGetProperty("lowStockThreshold", out var p10) || root.TryGetProperty("LowStockThreshold", out p10)) loadedBranding.LowStockThreshold = p10.GetInt32();
+                    }
+                    catch (Exception) {}
                 }
 
                 _tenantConfigCache[tenantId] = loadedBranding;

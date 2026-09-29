@@ -26,7 +26,8 @@ public class ApplicationDbContext : DbContext, IApplicationDbContext
     public DbSet<TenantConfiguration> TenantConfigurations => Set<TenantConfiguration>();
     public DbSet<AuditLog> AuditLogs => Set<AuditLog>();
     public DbSet<Item> Items => Set<Item>();
-    public DbSet<Product> Products => Set<Product>();
+    public DbSet<Stock> Products => Set<Stock>();
+    public DbSet<Stock> Stock => Set<Stock>();
     public DbSet<Customer> Customers => Set<Customer>();
     public DbSet<Supplier> Suppliers => Set<Supplier>();
     public DbSet<Sale> Sales => Set<Sale>();
@@ -73,7 +74,7 @@ public class ApplicationDbContext : DbContext, IApplicationDbContext
             .HasForeignKey(rp => rp.PermissionId);
 
         // Money & decimal precision configurations
-        modelBuilder.Entity<Product>(entity =>
+        modelBuilder.Entity<Stock>(entity =>
         {
             entity.Property(p => p.PurchasePrice).HasPrecision(18, 2);
             entity.Property(p => p.SellingPrice).HasPrecision(18, 2);
@@ -140,7 +141,7 @@ public class ApplicationDbContext : DbContext, IApplicationDbContext
         modelBuilder.Entity<TenantConfiguration>().HasQueryFilter(e => IsSuperAdmin || e.TenantId == CurrentTenantId);
         modelBuilder.Entity<AuditLog>().HasQueryFilter(e => IsSuperAdmin || e.TenantId == CurrentTenantId);
         modelBuilder.Entity<Item>().HasQueryFilter(e => IsSuperAdmin || e.TenantId == CurrentTenantId);
-        modelBuilder.Entity<Product>().HasQueryFilter(e => IsSuperAdmin || e.TenantId == CurrentTenantId);
+        modelBuilder.Entity<Stock>().HasQueryFilter(e => IsSuperAdmin || e.TenantId == CurrentTenantId);
         modelBuilder.Entity<Customer>().HasQueryFilter(e => IsSuperAdmin || e.TenantId == CurrentTenantId);
         modelBuilder.Entity<Supplier>().HasQueryFilter(e => IsSuperAdmin || e.TenantId == CurrentTenantId);
         modelBuilder.Entity<Sale>().HasQueryFilter(e => IsSuperAdmin || e.TenantId == CurrentTenantId);

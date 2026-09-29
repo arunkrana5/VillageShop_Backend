@@ -15,7 +15,8 @@ public interface IApplicationDbContext
     DbSet<TenantConfiguration> TenantConfigurations { get; }
     DbSet<AuditLog> AuditLogs { get; }
     DbSet<Item> Items { get; }
-    DbSet<Product> Products { get; }
+    DbSet<Stock> Products { get; }
+    DbSet<Stock> Stock { get; }
     DbSet<Customer> Customers { get; }
     DbSet<Supplier> Suppliers { get; }
     DbSet<Sale> Sales { get; }

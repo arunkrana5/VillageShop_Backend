@@ -60,7 +60,7 @@ public class StockController : ControllerBase
     }
 
     [HttpGet("{id}")]
-    public async Task<ActionResult<Product>> GetById(long id)
+    public async Task<ActionResult<Stock>> GetById(long id)
     {
         var product = await _stockInService.GetByIdAsync(id);
         if (product == null) return NotFound(PostResponse.Error("Stock item not found.", 404));
@@ -68,7 +68,7 @@ public class StockController : ControllerBase
     }
 
     [HttpGet]
-    public async Task<ActionResult<IEnumerable<Product>>> Search([FromQuery] StockInSearchRequest request)
+    public async Task<ActionResult<IEnumerable<Stock>>> Search([FromQuery] StockInSearchRequest request)
     {
         if (request == null) request = new StockInSearchRequest();
         if ((!request.TenantId.HasValue || request.TenantId <= 0) && Request.Headers.TryGetValue("X-Tenant-Id", out var headerTidStr) && long.TryParse(headerTidStr, out var headerTid) && headerTid > 0)

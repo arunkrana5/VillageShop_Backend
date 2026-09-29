@@ -10,7 +10,7 @@ public class SaleItem : BaseTenantEntity
 
     public long ProductId { get; set; }
 
-    public Product Product { get; set; } = null!;
+    public Stock Product { get; set; } = null!;
 
     public string ProductName { get; set; } = string.Empty;
 

@@ -11,6 +11,6 @@ public interface IStockInService
     Task<PostResponse> CreateAsync(CreateStockInRequest request);
     Task<PostResponse> UpdateAsync(UpdateStockInRequest request);
     Task<PostResponse> DeleteAsync(long id);
-    Task<Product?> GetByIdAsync(long id);
-    Task<IEnumerable<Product>> SearchAsync(StockInSearchRequest request);
+    Task<Stock?> GetByIdAsync(long id);
+    Task<IEnumerable<Stock>> SearchAsync(StockInSearchRequest request);
 }
