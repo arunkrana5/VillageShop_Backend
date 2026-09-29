@@ -511,48 +511,76 @@ public class SettingsController : ControllerBase
         if (!string.IsNullOrWhiteSpace(req.PrimaryColor))
         {
             var config = await _context.TenantConfigurations.FirstOrDefaultAsync(c => c.TenantId == id && !c.IsDeleted);
+            var loadedConfig = await GetOrLoadTenantConfigAsync(id);
+            loadedConfig.PrimaryColorHex = req.PrimaryColor.Trim();
+            loadedConfig.PrimaryColor = req.PrimaryColor.Trim();
+            loadedConfig.ButtonBgColorHex = req.PrimaryColor.Trim();
+            loadedConfig.ButtonBgColor = req.PrimaryColor.Trim();
+
+            var brandingObj = new
+            {
+                appName = loadedConfig.TenantName,
+                primaryColor = loadedConfig.PrimaryColorHex,
+                secondaryColor = loadedConfig.SecondaryColorHex,
+                tenantName = loadedConfig.TenantName,
+                appTitle = loadedConfig.AppTitle,
+                logoUrl = loadedConfig.LogoUrl,
+                logoIcon = loadedConfig.LogoIcon,
+                primaryColorHex = loadedConfig.PrimaryColorHex,
+                secondaryColorHex = loadedConfig.SecondaryColorHex,
+                accentColorHex = loadedConfig.AccentColorHex,
+                tagline = loadedConfig.Tagline,
+                currencySymbol = loadedConfig.CurrencySymbol,
+                fontFamily = loadedConfig.FontFamily,
+                fontSizeScale = loadedConfig.FontSizeScale,
+                textColorHex = loadedConfig.TextColorHex,
+                textColor = loadedConfig.TextColorHex,
+                pageBgColorHex = loadedConfig.PageBgColorHex,
+                pageBgColor = loadedConfig.PageBgColorHex,
+                cardBgColorHex = loadedConfig.CardBgColorHex,
+                cardBgColor = loadedConfig.CardBgColorHex,
+                amountColorHex = loadedConfig.AmountColorHex,
+                amountColor = loadedConfig.AmountColorHex,
+                buttonBgColorHex = loadedConfig.ButtonBgColorHex,
+                buttonBgColor = loadedConfig.ButtonBgColorHex,
+                buttonTextColorHex = loadedConfig.ButtonTextColorHex,
+                buttonTextColor = loadedConfig.ButtonTextColorHex
+            };
+
+            var brandingJsonStr = JsonSerializer.Serialize(brandingObj, JsonOpts);
+
             if (config != null)
             {
-                var loadedConfig = await GetOrLoadTenantConfigAsync(id);
-                loadedConfig.PrimaryColorHex = req.PrimaryColor;
-                loadedConfig.PrimaryColor = req.PrimaryColor;
-                loadedConfig.ButtonBgColorHex = req.PrimaryColor;
-                loadedConfig.ButtonBgColor = req.PrimaryColor;
-
-                var brandingObj = new
+                config.BrandingJson = brandingJsonStr;
+            }
+            else
+            {
+                var featureObj = new
                 {
-                    appName = loadedConfig.TenantName,
-                    primaryColor = loadedConfig.PrimaryColorHex,
-                    secondaryColor = loadedConfig.SecondaryColorHex,
-                    tenantName = loadedConfig.TenantName,
-                    appTitle = loadedConfig.AppTitle,
-                    logoUrl = loadedConfig.LogoUrl,
-                    logoIcon = loadedConfig.LogoIcon,
-                    primaryColorHex = loadedConfig.PrimaryColorHex,
-                    secondaryColorHex = loadedConfig.SecondaryColorHex,
-                    accentColorHex = loadedConfig.AccentColorHex,
-                    tagline = loadedConfig.Tagline,
-                    currencySymbol = loadedConfig.CurrencySymbol,
-                    fontFamily = loadedConfig.FontFamily,
-                    fontSizeScale = loadedConfig.FontSizeScale,
-                    textColorHex = loadedConfig.TextColorHex,
-                    textColor = loadedConfig.TextColorHex,
-                    pageBgColorHex = loadedConfig.PageBgColorHex,
-                    pageBgColor = loadedConfig.PageBgColorHex,
-                    cardBgColorHex = loadedConfig.CardBgColorHex,
-                    cardBgColor = loadedConfig.CardBgColorHex,
-                    amountColorHex = loadedConfig.AmountColorHex,
-                    amountColor = loadedConfig.AmountColorHex,
-                    buttonBgColorHex = loadedConfig.ButtonBgColorHex,
-                    buttonBgColor = loadedConfig.ButtonBgColorHex,
-                    buttonTextColorHex = loadedConfig.ButtonTextColorHex,
-                    buttonTextColor = loadedConfig.ButtonTextColorHex
+                    loadedConfig.EnableUdhaar,
+                    loadedConfig.EnableBarcodeScanner,
+                    loadedConfig.EnableOnlinePayment,
+                    loadedConfig.EnableHindiLanguage,
+                    loadedConfig.EnableReceiptPrinting,
+                    loadedConfig.EnablePOSDiscount,
+                    loadedConfig.EnableTaxCalculation,
+                    loadedConfig.DefaultTaxPercent,
+                    loadedConfig.AllowNegativeStock,
+                    loadedConfig.LowStockThreshold
                 };
-                config.BrandingJson = JsonSerializer.Serialize(brandingObj, JsonOpts);
+                config = new TenantConfiguration
+                {
+                    TenantId = id,
+                    BrandingJson = brandingJsonStr,
+                    FeatureJson = JsonSerializer.Serialize(featureObj, JsonOpts),
+                    MenuJson = JsonSerializer.Serialize(loadedConfig.MenuItems, JsonOpts)
+                };
+                _context.TenantConfigurations.Add(config);
             }
         }
 
         await _context.SaveChangesAsync();
+        _tenantConfigCache.TryRemove(id, out _);
 
         return Ok(new PostResponse
         {
