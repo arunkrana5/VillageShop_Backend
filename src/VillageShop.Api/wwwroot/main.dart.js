@@ -94189,20 +94189,23 @@ A.q4.prototype={
 aj(){var s=$.au()
 return new A.Zn(new A.cu(B.aZ,s),new A.cu(B.aZ,s),new A.cu(B.aZ,s))}}
 A.Zn.prototype={
-K(a){var s,r=this,q=null,p=A.bD(a,!0,t.W0),o=A.bD(a,!0,t.B),n=A.aX(16),m=o.Q,l=t.p
-m=A.a([B.PM,B.ay,A.G(m.length!==0&&m!=="Store Client"?m:"Shop SaaS Portal",q,q,q,B.a9P,q,q),B.adp,B.dp],l)
-s=r.r
-if(s!=null)B.b.a0(m,A.a([A.G(s,q,q,q,B.a9b,q,q),B.ay],l))
-m.push(A.cM(!1,r.d,B.Qv,q,!1,q))
-m.push(B.fb)
-m.push(A.cM(!1,r.e,B.Qw,q,!1,q))
-m.push(B.fb)
-m.push(A.cM(!1,r.f,B.Qx,q,!0,q))
-m.push(B.dp)
-l=p.f
-s=l?q:new A.av1(r,p,a)
-m.push(A.cX(A.hu(!1,l?B.LF:B.adl,q,q,B.aW,q,q,q,q,s,q,q),54,1/0))
-return A.nL(q,B.lK,A.ek(A.nR(A.aIh(new A.bb(B.m7,A.bi(m,B.o,B.n,B.aF),q),4,new A.bN(n,B.r)),B.m7,q),q,q),q,q)}}
+K(a){var s,r,q,p,o=this,n=null,m=A.bD(a,!0,t.W0)
+A.bD(a,!0,t.B)
+s=A.aX(16)
+r=t.p
+q=A.a([B.PM,B.ay,A.G("Shop Portal",n,n,n,B.a9P,n,n),B.adp,B.dp],r)
+p=o.r
+if(p!=null)B.b.a0(q,A.a([A.G(p,n,n,n,B.a9b,n,n),B.ay],r))
+q.push(A.cM(!1,o.d,B.Qv,n,!1,n))
+q.push(B.fb)
+q.push(A.cM(!1,o.e,B.Qw,n,!1,n))
+q.push(B.fb)
+q.push(A.cM(!1,o.f,B.Qx,n,!0,n))
+q.push(B.dp)
+r=m.f
+p=r?n:new A.av1(o,m,a)
+q.push(A.cX(A.hu(!1,r?B.LF:B.adl,n,n,B.aW,n,n,n,n,p,n,n),54,1/0))
+return A.nL(n,B.lK,A.ek(A.nR(A.aIh(new A.bb(B.m7,A.bi(q,B.o,B.n,B.aF),n),4,new A.bN(s,B.r)),B.m7,n),n,n),n,n)}}
 A.av1.prototype={
 $0(){var s=0,r=A.L(t.H),q=this,p,o,n,m,l,k
 var $async$$0=A.M(function(a,b){if(a===1)return A.I(b,r)
@@ -100043,7 +100046,7 @@ B.ail=new A.na(null,null,null,null,null,null,null,null,null,null,null,null,null,
 B.P8=new A.b7(57627,!1)
 B.PR=new A.bP(B.P8,null,null,null,null)
 B.as=new A.e1(4,B.fu,B.dy)
-B.Qv=new A.na(null,null,null,"Tenant Code (e.g. ARUN_DC, SUPERADMIN)",null,null,null,null,null,null,"Enter your store tenant code",null,null,null,null,null,null,null,null,null,null,null,null,null,B.PR,null,null,null,null,null,null,null,null,null,null,null,null,null,null,null,null,null,null,null,null,null,null,null,B.as,!0,null,null,null)
+B.Qv=new A.na(null,null,null,"Tenant Code",null,null,null,null,null,null,"Enter your store tenant code",null,null,null,null,null,null,null,null,null,null,null,null,null,B.PR,null,null,null,null,null,null,null,null,null,null,null,null,null,null,null,null,null,null,null,null,null,null,null,B.as,!0,null,null,null)
 B.Pe=new A.b7(58513,!1)
 B.PU=new A.bP(B.Pe,null,null,null,null)
 B.Qw=new A.na(null,null,null,"Username / \u092f\u0942\u091c\u0930\u0928\u093e\u092e",null,null,null,null,null,null,null,null,null,null,null,null,null,null,null,null,null,null,null,null,B.PU,null,null,null,null,null,null,null,null,null,null,null,null,null,null,null,null,null,null,null,null,null,null,null,B.as,!0,null,null,null)
