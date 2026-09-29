@@ -6,7 +6,7 @@ using VillageShop.Domain.Entities;
 
 namespace VillageShop.Application.StockIn.Services;
 
-public interface IStockInService
+public interface IStockService
 {
     Task<PostResponse> CreateAsync(CreateStockInRequest request);
     Task<PostResponse> UpdateAsync(UpdateStockInRequest request);

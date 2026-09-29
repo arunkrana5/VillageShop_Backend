@@ -49,7 +49,7 @@ builder.Services.AddScoped<IJwtTokenGenerator, JwtTokenGenerator>();
 // Application Services DI
 builder.Services.AddScoped<IAuthService, AuthService>();
 builder.Services.AddScoped<IItemService, ItemService>();
-builder.Services.AddScoped<IStockInService, StockInService>();
+builder.Services.AddScoped<IStockService, StockService>();
 builder.Services.AddScoped<ISaleService, SaleService>();
 
 // JWT Authentication Configuration
@@ -97,18 +97,6 @@ using (var scope = app.Services.CreateScope())
         try { db.Database.ExecuteSqlRaw("IF NOT EXISTS (SELECT * FROM sys.columns WHERE object_id = OBJECT_ID('V_Stock') AND name = 'ImageUrl') ALTER TABLE V_Stock ADD ImageUrl NVARCHAR(MAX) NULL;"); } catch (Exception) {}
         try { db.Database.ExecuteSqlRaw("IF NOT EXISTS (SELECT * FROM sys.columns WHERE object_id = OBJECT_ID('V_Stock') AND name = 'ItemId') ALTER TABLE V_Stock ADD ItemId BIGINT NULL;"); } catch (Exception) {}
 
-        // Clear all dummy/test records from DB for clean real-time testing
-        try {
-            db.Database.ExecuteSqlRaw(@"
-                DELETE FROM V_SaleItems;
-                DELETE FROM V_Sales;
-                DELETE FROM V_UdhaarLedgers;
-                IF EXISTS (SELECT * FROM sys.tables WHERE name = 'V_Stock') DELETE FROM V_Stock;
-                IF EXISTS (SELECT * FROM sys.tables WHERE name = 'V_Products') DELETE FROM V_Products;
-                DELETE FROM V_Items;
-                DELETE FROM V_Customers;
-            ");
-        } catch (Exception) {}
 
         // Ensure All 4 SaaS Client Tenants & Dedicated User Accounts exist in DB
         var targetClients = new[]

@@ -18,11 +18,11 @@ namespace VillageShop.Api.Controllers;
 [Route("api/products")]
 public class StockController : ControllerBase
 {
-    private readonly IStockInService _stockInService;
+    private readonly IStockService _stockService;
 
-    public StockController(IStockInService stockInService)
+    public StockController(IStockService stockService)
     {
-        _stockInService = stockInService;
+        _stockService = stockService;
     }
 
     [HttpPost]
@@ -34,7 +34,7 @@ public class StockController : ControllerBase
             request.TenantId = headerTid;
         }
 
-        var response = await _stockInService.CreateAsync(request);
+        var response = await _stockService.CreateAsync(request);
         return StatusCode(response.StatusCode, response);
     }
 
@@ -48,21 +48,21 @@ public class StockController : ControllerBase
             request.TenantId = headerTid;
         }
 
-        var response = await _stockInService.UpdateAsync(request);
+        var response = await _stockService.UpdateAsync(request);
         return StatusCode(response.StatusCode, response);
     }
 
     [HttpDelete("{id}")]
     public async Task<ActionResult<PostResponse>> Delete(long id)
     {
-        var response = await _stockInService.DeleteAsync(id);
+        var response = await _stockService.DeleteAsync(id);
         return StatusCode(response.StatusCode, response);
     }
 
     [HttpGet("{id}")]
     public async Task<ActionResult<Stock>> GetById(long id)
     {
-        var product = await _stockInService.GetByIdAsync(id);
+        var product = await _stockService.GetByIdAsync(id);
         if (product == null) return NotFound(PostResponse.Error("Stock item not found.", 404));
         return Ok(product);
     }
@@ -76,7 +76,7 @@ public class StockController : ControllerBase
             request.TenantId = headerTid;
         }
 
-        var products = await _stockInService.SearchAsync(request);
+        var products = await _stockService.SearchAsync(request);
         return Ok(products);
     }
 }

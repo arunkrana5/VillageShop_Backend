@@ -11,11 +11,11 @@ using VillageShop.Domain.Entities;
 
 namespace VillageShop.Infrastructure.Services;
 
-public class StockInService : IStockInService
+public class StockService : IStockService
 {
     private readonly IApplicationDbContext _context;
 
-    public StockInService(IApplicationDbContext context)
+    public StockService(IApplicationDbContext context)
     {
         _context = context;
     }
