@@ -265,26 +265,49 @@ public class SettingsController : ControllerBase
     public async Task<IActionResult> GetTenants()
     {
         var dbTenants = await _context.Tenants.IgnoreQueryFilters().Where(t => !t.IsDeleted).ToListAsync();
-        var tenants = dbTenants.Select(t => new TenantInfo
+        var tenantList = new List<TenantInfo>();
+
+        foreach (var t in dbTenants)
         {
-            Id = t.ID,
-            TenantId = $"TNT-{t.ID:D3}",
-            Name = t.TenantName,
-            Code = t.TenantCode,
-            Plan = "Enterprise SaaS",
-            ActiveStatus = t.IsActive ? "ACTIVE" : "INACTIVE",
-            OwnerName = t.OwnerName ?? "Store Owner",
-            OwnerPhone = t.Mobile ?? "+91 98765 43210",
-            JoinedDate = t.CreatedDate.ToString("dd MMM yyyy"),
-            StoresCount = 1
-        }).ToList();
+            var adminUser = await _context.Users.IgnoreQueryFilters().FirstOrDefaultAsync(u => u.TenantId == t.ID && !u.IsDeleted);
+            var config = await _context.TenantConfigurations.IgnoreQueryFilters().FirstOrDefaultAsync(c => c.TenantId == t.ID && !c.IsDeleted);
+            var primaryHex = "#0F172A";
+            if (config != null && !string.IsNullOrWhiteSpace(config.BrandingJson))
+            {
+                try
+                {
+                    using var doc = JsonDocument.Parse(config.BrandingJson);
+                    if (doc.RootElement.TryGetProperty("primaryColorHex", out var p1) || doc.RootElement.TryGetProperty("primaryColor", out p1))
+                    {
+                        primaryHex = p1.GetString() ?? "#0F172A";
+                    }
+                }
+                catch (Exception) {}
+            }
+
+            tenantList.Add(new TenantInfo
+            {
+                Id = t.ID,
+                TenantId = $"TNT-{t.ID:D3}",
+                Name = t.TenantName,
+                Code = t.TenantCode,
+                Plan = "Enterprise SaaS",
+                ActiveStatus = t.IsActive ? "ACTIVE" : "INACTIVE",
+                OwnerName = t.OwnerName ?? "Store Owner",
+                OwnerPhone = t.Mobile ?? "+91 98765 43210",
+                JoinedDate = t.CreatedDate.ToString("dd MMM yyyy"),
+                StoresCount = 1,
+                AdminUsername = adminUser?.Username ?? "admin",
+                PrimaryColor = primaryHex
+            });
+        }
 
         return Ok(new PostResponse
         {
             Status = true,
             StatusCode = 200,
             Message = "Registered SaaS clients list retrieved from DB successfully.",
-            AdditionalMessage = JsonSerializer.Serialize(tenants, JsonOpts)
+            AdditionalMessage = JsonSerializer.Serialize(tenantList, JsonOpts)
         });
     }
 
@@ -310,6 +333,18 @@ public class SettingsController : ControllerBase
                 Status = false,
                 StatusCode = 400,
                 Message = $"Tenant code '{cleanCode}' already exists."
+            });
+        }
+
+        var targetUsername = (!string.IsNullOrWhiteSpace(req.AdminUsername) ? req.AdminUsername.Trim() : (req.Code.ToLower() + "_admin")).ToLower();
+        var existingUser = await _context.Users.IgnoreQueryFilters().FirstOrDefaultAsync(u => u.Username.ToLower() == targetUsername && !u.IsDeleted);
+        if (existingUser != null)
+        {
+            return BadRequest(new PostResponse
+            {
+                Status = false,
+                StatusCode = 400,
+                Message = $"Username '{targetUsername}' is already taken. Username must be unique across all clients."
             });
         }
 
@@ -340,11 +375,14 @@ public class SettingsController : ControllerBase
             _context.Roles.Add(role);
             await _context.SaveChangesAsync();
 
-            var passHash = BCrypt.Net.BCrypt.HashPassword("admin123");
+            var username = !string.IsNullOrWhiteSpace(req.AdminUsername) ? req.AdminUsername.Trim() : (req.Code.ToLower() + "_admin");
+            var rawPass = !string.IsNullOrWhiteSpace(req.AdminPassword) ? req.AdminPassword : "12345";
+            var passHash = BCrypt.Net.BCrypt.HashPassword(rawPass);
+
             var user = new User
             {
                 TenantId = tenant.ID,
-                Username = "admin",
+                Username = username,
                 FullName = tenant.OwnerName,
                 Mobile = tenant.Mobile,
                 Email = tenant.Email,
@@ -355,7 +393,68 @@ public class SettingsController : ControllerBase
             _context.Users.Add(user);
             await _context.SaveChangesAsync();
 
-            await CreateAndSeedDefaultTenantConfigInDbAsync(tenant.ID);
+            var seedConfig = await GetInitialDefaultConfigForTenantAsync(tenant.ID);
+            if (!string.IsNullOrWhiteSpace(req.PrimaryColor))
+            {
+                seedConfig.PrimaryColorHex = req.PrimaryColor;
+                seedConfig.PrimaryColor = req.PrimaryColor;
+                seedConfig.ButtonBgColorHex = req.PrimaryColor;
+                seedConfig.ButtonBgColor = req.PrimaryColor;
+            }
+            
+            var brandingObj = new
+            {
+                appName = seedConfig.TenantName,
+                primaryColor = seedConfig.PrimaryColorHex,
+                secondaryColor = seedConfig.SecondaryColorHex,
+                tenantName = seedConfig.TenantName,
+                appTitle = seedConfig.AppTitle,
+                logoUrl = seedConfig.LogoUrl,
+                logoIcon = seedConfig.LogoIcon,
+                primaryColorHex = seedConfig.PrimaryColorHex,
+                secondaryColorHex = seedConfig.SecondaryColorHex,
+                accentColorHex = seedConfig.AccentColorHex,
+                tagline = seedConfig.Tagline,
+                currencySymbol = seedConfig.CurrencySymbol,
+                fontFamily = seedConfig.FontFamily,
+                fontSizeScale = seedConfig.FontSizeScale,
+                textColorHex = seedConfig.TextColorHex,
+                textColor = seedConfig.TextColorHex,
+                pageBgColorHex = seedConfig.PageBgColorHex,
+                pageBgColor = seedConfig.PageBgColorHex,
+                cardBgColorHex = seedConfig.CardBgColorHex,
+                cardBgColor = seedConfig.CardBgColorHex,
+                amountColorHex = seedConfig.AmountColorHex,
+                amountColor = seedConfig.AmountColorHex,
+                buttonBgColorHex = seedConfig.ButtonBgColorHex,
+                buttonBgColor = seedConfig.ButtonBgColorHex,
+                buttonTextColorHex = seedConfig.ButtonTextColorHex,
+                buttonTextColor = seedConfig.ButtonTextColorHex
+            };
+
+            var featureObj = new
+            {
+                seedConfig.EnableUdhaar,
+                seedConfig.EnableBarcodeScanner,
+                seedConfig.EnableOnlinePayment,
+                seedConfig.EnableHindiLanguage,
+                seedConfig.EnableReceiptPrinting,
+                seedConfig.EnablePOSDiscount,
+                seedConfig.EnableTaxCalculation,
+                seedConfig.DefaultTaxPercent,
+                seedConfig.AllowNegativeStock,
+                seedConfig.LowStockThreshold
+            };
+
+            var newDbRecord = new TenantConfiguration
+            {
+                TenantId = tenant.ID,
+                BrandingJson = JsonSerializer.Serialize(brandingObj, JsonOpts),
+                FeatureJson = JsonSerializer.Serialize(featureObj, JsonOpts),
+                MenuJson = JsonSerializer.Serialize(seedConfig.MenuItems, JsonOpts)
+            };
+            _context.TenantConfigurations.Add(newDbRecord);
+            await _context.SaveChangesAsync();
         }
         catch (Exception) {}
 
@@ -378,9 +477,80 @@ public class SettingsController : ControllerBase
         }
 
         if (!string.IsNullOrWhiteSpace(req.Name)) tenant.TenantName = req.Name.Trim();
+        if (!string.IsNullOrWhiteSpace(req.Code)) tenant.TenantCode = req.Code.Trim().ToUpper();
         if (!string.IsNullOrWhiteSpace(req.OwnerName)) tenant.OwnerName = req.OwnerName.Trim();
         if (!string.IsNullOrWhiteSpace(req.OwnerPhone)) tenant.Mobile = req.OwnerPhone.Trim();
+        if (!string.IsNullOrWhiteSpace(req.Email)) tenant.Email = req.Email.Trim();
+        if (!string.IsNullOrWhiteSpace(req.Village)) tenant.Village = req.Village.Trim();
         if (req.ActiveStatus != null) tenant.IsActive = req.ActiveStatus == "ACTIVE";
+
+        // Update user username / password if specified
+        var adminUser = await _context.Users.FirstOrDefaultAsync(u => u.TenantId == id && !u.IsDeleted);
+        if (adminUser != null)
+        {
+            if (!string.IsNullOrWhiteSpace(req.AdminUsername))
+            {
+                var cleanNewUser = req.AdminUsername.Trim().ToLower();
+                var duplicateUser = await _context.Users.IgnoreQueryFilters()
+                    .FirstOrDefaultAsync(u => u.Username.ToLower() == cleanNewUser && u.TenantId != id && !u.IsDeleted);
+                if (duplicateUser != null)
+                {
+                    return BadRequest(new PostResponse
+                    {
+                        Status = false,
+                        StatusCode = 400,
+                        Message = $"Username '{req.AdminUsername}' is already taken by another client."
+                    });
+                }
+                adminUser.Username = req.AdminUsername.Trim();
+            }
+            if (!string.IsNullOrWhiteSpace(req.AdminPassword)) adminUser.PasswordHash = BCrypt.Net.BCrypt.HashPassword(req.AdminPassword);
+        }
+
+        // Update tenant configuration primary color if specified
+        if (!string.IsNullOrWhiteSpace(req.PrimaryColor))
+        {
+            var config = await _context.TenantConfigurations.FirstOrDefaultAsync(c => c.TenantId == id && !c.IsDeleted);
+            if (config != null)
+            {
+                var loadedConfig = await GetOrLoadTenantConfigAsync(id);
+                loadedConfig.PrimaryColorHex = req.PrimaryColor;
+                loadedConfig.PrimaryColor = req.PrimaryColor;
+                loadedConfig.ButtonBgColorHex = req.PrimaryColor;
+                loadedConfig.ButtonBgColor = req.PrimaryColor;
+
+                var brandingObj = new
+                {
+                    appName = loadedConfig.TenantName,
+                    primaryColor = loadedConfig.PrimaryColorHex,
+                    secondaryColor = loadedConfig.SecondaryColorHex,
+                    tenantName = loadedConfig.TenantName,
+                    appTitle = loadedConfig.AppTitle,
+                    logoUrl = loadedConfig.LogoUrl,
+                    logoIcon = loadedConfig.LogoIcon,
+                    primaryColorHex = loadedConfig.PrimaryColorHex,
+                    secondaryColorHex = loadedConfig.SecondaryColorHex,
+                    accentColorHex = loadedConfig.AccentColorHex,
+                    tagline = loadedConfig.Tagline,
+                    currencySymbol = loadedConfig.CurrencySymbol,
+                    fontFamily = loadedConfig.FontFamily,
+                    fontSizeScale = loadedConfig.FontSizeScale,
+                    textColorHex = loadedConfig.TextColorHex,
+                    textColor = loadedConfig.TextColorHex,
+                    pageBgColorHex = loadedConfig.PageBgColorHex,
+                    pageBgColor = loadedConfig.PageBgColorHex,
+                    cardBgColorHex = loadedConfig.CardBgColorHex,
+                    cardBgColor = loadedConfig.CardBgColorHex,
+                    amountColorHex = loadedConfig.AmountColorHex,
+                    amountColor = loadedConfig.AmountColorHex,
+                    buttonBgColorHex = loadedConfig.ButtonBgColorHex,
+                    buttonBgColor = loadedConfig.ButtonBgColorHex,
+                    buttonTextColorHex = loadedConfig.ButtonTextColorHex,
+                    buttonTextColor = loadedConfig.ButtonTextColorHex
+                };
+                config.BrandingJson = JsonSerializer.Serialize(brandingObj, JsonOpts);
+            }
+        }
 
         await _context.SaveChangesAsync();
 
@@ -388,7 +558,7 @@ public class SettingsController : ControllerBase
         {
             Status = true,
             StatusCode = 200,
-            Message = $"Tenant '{tenant.TenantName}' updated successfully."
+            Message = $"Tenant '{tenant.TenantName}' and account details updated successfully."
         });
     }
 
@@ -621,6 +791,8 @@ public class TenantInfo
     public string OwnerPhone { get; set; } = "";
     public string JoinedDate { get; set; } = "";
     public int StoresCount { get; set; } = 1;
+    public string AdminUsername { get; set; } = "admin";
+    public string PrimaryColor { get; set; } = "#DC2626";
 }
 
 public class MobileTenantConfig
@@ -693,4 +865,7 @@ public class CreateTenantRequest
     public string? Village { get; set; }
     public string Plan { get; set; } = "Enterprise SaaS";
     public string ActiveStatus { get; set; } = "ACTIVE";
+    public string? AdminUsername { get; set; }
+    public string? AdminPassword { get; set; }
+    public string? PrimaryColor { get; set; }
 }

@@ -128,20 +128,26 @@ using (var scope = app.Services.CreateScope())
             try { db.SaveChanges(); } catch (Exception) {}
         }
 
-        var superAdminUser = db.Users.FirstOrDefault(u => u.TenantId == superAdminTenant.ID || u.Username == "admin");
+        var superAdminUser = db.Users.FirstOrDefault(u => u.TenantId == superAdminTenant.ID || u.Username == "superadmin" || u.Username == "admin");
         if (superAdminUser == null)
         {
             db.Users.Add(new User
             {
                 TenantId = superAdminTenant.ID,
-                Username = "admin",
-                FullName = "Super Admin",
-                PasswordHash = BCrypt.Net.BCrypt.HashPassword("admin123"),
+                Username = "superadmin",
+                FullName = "System Super Administrator",
+                PasswordHash = BCrypt.Net.BCrypt.HashPassword("12345"),
                 RoleId = superAdminRole.ID > 0 ? superAdminRole.ID : 1,
                 Mobile = "+91 99999 99999",
                 IsActive = true,
                 IsDeleted = false
             });
+            try { db.SaveChanges(); } catch (Exception) {}
+        }
+        else
+        {
+            superAdminUser.Username = "superadmin";
+            superAdminUser.PasswordHash = BCrypt.Net.BCrypt.HashPassword("12345");
             try { db.SaveChanges(); } catch (Exception) {}
         }
     }

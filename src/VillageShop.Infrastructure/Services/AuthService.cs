@@ -26,31 +26,40 @@ public class AuthService : IAuthService
     {
         try
         {
-            if (string.IsNullOrWhiteSpace(request.TenantCode) || string.IsNullOrWhiteSpace(request.Username) || string.IsNullOrWhiteSpace(request.Password))
+            if (string.IsNullOrWhiteSpace(request.Username) || string.IsNullOrWhiteSpace(request.Password))
             {
-                return PostResponse.Error("Tenant code, username, and password are required.", 400);
+                return PostResponse.Error("Username and password are required.", 400);
             }
-
-            var reqCode = request.TenantCode.Trim().ToLower();
-
-            // Case-insensitive lookup for Tenant
-            var tenant = await _context.Tenants.IgnoreQueryFilters().FirstOrDefaultAsync(t => t.TenantCode.ToLower() == reqCode && !t.IsDeleted && t.IsActive);
-
-            if (tenant == null)
-            {
-                return PostResponse.Error("Invalid tenant code or tenant account is inactive.", 401);
-            }
-
-            // Set tenant filter to find user for specified tenant
-            _currentTenantService.SetTenantId(tenant.ID);
 
             var reqUser = request.Username.Trim().ToLower();
-            var user = await _context.Users.IgnoreQueryFilters().Include(u => u.Role).FirstOrDefaultAsync(u => u.TenantId == tenant.ID && u.Username.ToLower() == reqUser && !u.IsDeleted && u.IsActive);
+            Tenant? tenant = null;
+            User? user = null;
 
-            if (user == null)
+            if (!string.IsNullOrWhiteSpace(request.TenantCode))
+            {
+                var reqCode = request.TenantCode.Trim().ToLower();
+                tenant = await _context.Tenants.IgnoreQueryFilters().FirstOrDefaultAsync(t => t.TenantCode.ToLower() == reqCode && !t.IsDeleted && t.IsActive);
+                if (tenant != null)
+                {
+                    user = await _context.Users.IgnoreQueryFilters().Include(u => u.Role).FirstOrDefaultAsync(u => u.TenantId == tenant.ID && u.Username.ToLower() == reqUser && !u.IsDeleted && u.IsActive);
+                }
+            }
+            else
+            {
+                // Auto-resolve tenant from username
+                user = await _context.Users.IgnoreQueryFilters().Include(u => u.Role).FirstOrDefaultAsync(u => u.Username.ToLower() == reqUser && !u.IsDeleted && u.IsActive);
+                if (user != null)
+                {
+                    tenant = await _context.Tenants.IgnoreQueryFilters().FirstOrDefaultAsync(t => t.ID == user.TenantId && !t.IsDeleted && t.IsActive);
+                }
+            }
+
+            if (tenant == null || user == null)
             {
                 return PostResponse.Error("Invalid username or password.", 401);
             }
+
+            _currentTenantService.SetTenantId(tenant.ID);
 
             // Verify password using BCrypt
             bool isPasswordValid = false;
@@ -103,15 +112,18 @@ public class AuthService : IAuthService
 
     public async Task<PostResponse> RegisterTenantAsync(RegisterTenantRequest request)
     {
-        if (string.IsNullOrWhiteSpace(request.TenantCode) || string.IsNullOrWhiteSpace(request.TenantName) || string.IsNullOrWhiteSpace(request.AdminUsername) || string.IsNullOrWhiteSpace(request.AdminPassword))
+        var rawPassword = string.IsNullOrWhiteSpace(request.AdminPassword) ? "12345" : request.AdminPassword;
+
+        if (string.IsNullOrWhiteSpace(request.TenantCode) || string.IsNullOrWhiteSpace(request.TenantName) || string.IsNullOrWhiteSpace(request.AdminUsername))
         {
-            return PostResponse.Error("Required fields missing (TenantCode, TenantName, AdminUsername, AdminPassword).", 400);
+            return PostResponse.Error("Required fields missing (TenantCode, TenantName, AdminUsername).", 400);
         }
 
-        var existingTenant = await _context.Tenants.AnyAsync(t => t.TenantCode == request.TenantCode);
-        if (existingTenant)
+        var cleanAdminUser = request.AdminUsername.Trim().ToLower();
+        var isUsernameTaken = await _context.Users.IgnoreQueryFilters().AnyAsync(u => u.Username.ToLower() == cleanAdminUser && !u.IsDeleted);
+        if (isUsernameTaken)
         {
-            return PostResponse.Error("Tenant code already exists.", 409);
+            return PostResponse.Error($"Username '{request.AdminUsername}' is already taken. Username must be unique across all clients.", 409);
         }
 
         var tenant = new Tenant
@@ -150,7 +162,7 @@ public class AuthService : IAuthService
             TenantId = tenant.ID,
             Username = request.AdminUsername,
             Email = request.Email,
-            PasswordHash = BCrypt.Net.BCrypt.HashPassword(request.AdminPassword),
+            PasswordHash = BCrypt.Net.BCrypt.HashPassword(rawPassword),
             FullName = request.OwnerName,
             Mobile = request.Mobile,
             RoleId = adminRole.ID
