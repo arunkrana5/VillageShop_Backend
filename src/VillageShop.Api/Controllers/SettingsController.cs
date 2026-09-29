@@ -413,8 +413,6 @@ public class SettingsController : ControllerBase
 
     private async Task<MobileTenantConfig> GetOrLoadTenantConfigAsync(long tenantId)
     {
-        if (_tenantConfigCache.TryGetValue(tenantId, out var cached)) return cached;
-
         try
         {
             var dbConfig = await _context.TenantConfigurations.IgnoreQueryFilters().OrderByDescending(c => c.ID).FirstOrDefaultAsync(c => c.TenantId == tenantId && !c.IsDeleted);
