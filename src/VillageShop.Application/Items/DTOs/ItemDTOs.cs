@@ -6,6 +6,7 @@ public class CreateItemRequest
     public string? TenantCode { get; set; }
     public string ItemCode { get; set; } = string.Empty;
     public string Name { get; set; } = string.Empty;
+    public string ItemName { get; set; } = string.Empty;
     public string? Category { get; set; }
     public string Unit { get; set; } = "pcs";
     public string Format { get; set; } = "Packed";
@@ -19,6 +20,7 @@ public class UpdateItemRequest
     public string? TenantCode { get; set; }
     public string ItemCode { get; set; } = string.Empty;
     public string Name { get; set; } = string.Empty;
+    public string ItemName { get; set; } = string.Empty;
     public string? Category { get; set; }
     public string Unit { get; set; } = "pcs";
     public string Format { get; set; } = "Packed";

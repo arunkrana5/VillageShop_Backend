@@ -29,11 +29,14 @@ public class ItemService : IItemService
             long effectiveTenantId = request.TenantId ?? _currentTenantService.TenantId;
             if (effectiveTenantId <= 0) effectiveTenantId = 1;
 
+            var rawName = !string.IsNullOrWhiteSpace(request.Name) ? request.Name : request.ItemName;
+            if (string.IsNullOrWhiteSpace(rawName)) rawName = $"Item #{Random.Shared.Next(100, 999)}";
+
             var item = new Item
             {
                 TenantId = effectiveTenantId,
                 ItemCode = string.IsNullOrWhiteSpace(request.ItemCode) ? $"ITM-{Random.Shared.Next(1000, 9999)}" : request.ItemCode.Trim(),
-                Name = request.Name.Trim(),
+                Name = rawName.Trim(),
                 Category = request.Category,
                 Unit = string.IsNullOrWhiteSpace(request.Unit) ? "pcs" : request.Unit.Trim(),
                 Format = string.IsNullOrWhiteSpace(request.Format) ? "Packed" : request.Format.Trim(),
