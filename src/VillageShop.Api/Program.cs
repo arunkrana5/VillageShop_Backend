@@ -94,6 +94,39 @@ using (var scope = app.Services.CreateScope())
         var db = scope.ServiceProvider.GetRequiredService<ApplicationDbContext>();
         try { db.Database.EnsureCreated(); } catch (Exception) {}
 
+        // Ensure V_Items table exists in SQL Server / database
+        try
+        {
+            var createVItemsSql = @"
+IF NOT EXISTS (SELECT * FROM sys.tables WHERE name = 'V_Items')
+BEGIN
+    CREATE TABLE [V_Items] (
+        [ID] bigint IDENTITY(1,1) NOT NULL,
+        [TenantId] bigint NOT NULL,
+        [ItemCode] nvarchar(100) NOT NULL,
+        [Name] nvarchar(250) NOT NULL,
+        [Category] nvarchar(150) NULL,
+        [Unit] nvarchar(50) NOT NULL DEFAULT 'pcs',
+        [Format] nvarchar(50) NOT NULL DEFAULT 'Packed',
+        [Description] nvarchar(max) NULL,
+        [IsActive] bit NOT NULL DEFAULT 1,
+        [IsDeleted] bit NOT NULL DEFAULT 0,
+        [Priority] int NOT NULL DEFAULT 0,
+        [CreatedBy] bigint NOT NULL DEFAULT 0,
+        [CreatedDate] datetime2 NOT NULL DEFAULT GETUTCDATE(),
+        [ModifiedBy] bigint NOT NULL DEFAULT 0,
+        [ModifiedDate] datetime2 NOT NULL DEFAULT GETUTCDATE(),
+        [DeletedBy] bigint NOT NULL DEFAULT 0,
+        [DeletedDate] datetime2 NULL,
+        [EntrySource] nvarchar(100) NOT NULL DEFAULT '',
+        [IPAddress] nvarchar(100) NOT NULL DEFAULT '',
+        CONSTRAINT [PK_V_Items] PRIMARY KEY CLUSTERED ([ID] ASC)
+    );
+END";
+            db.Database.ExecuteSqlRaw(createVItemsSql);
+        }
+        catch (Exception) {}
+
 
         // Ensure ONLY SuperAdmin Default Tenant & System Administrator Account exist in DB
         var superAdminTenant = db.Tenants.FirstOrDefault(t => t.ID == 1 || t.TenantCode == "SUPERADMIN");
