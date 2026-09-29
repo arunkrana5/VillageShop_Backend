@@ -271,7 +271,7 @@ public class SettingsController : ControllerBase
         {
             var adminUser = await _context.Users.IgnoreQueryFilters().FirstOrDefaultAsync(u => u.TenantId == t.ID && !u.IsDeleted);
             var config = await _context.TenantConfigurations.IgnoreQueryFilters().FirstOrDefaultAsync(c => c.TenantId == t.ID && !c.IsDeleted);
-            var primaryHex = "#0F172A";
+            var primaryHex = "#93387A";
             if (config != null && !string.IsNullOrWhiteSpace(config.BrandingJson))
             {
                 try
@@ -725,9 +725,9 @@ public class SettingsController : ControllerBase
             TenantCode = tCode,
             AppName = tName,
             AppTitle = tName,
-            PrimaryColorHex = "#DC2626",
+            PrimaryColorHex = "#93387A",
             SecondaryColorHex = "#D97706",
-            ButtonBgColorHex = "#DC2626",
+            ButtonBgColorHex = "#93387A",
             Tagline = "Digital Store System",
             CurrencySymbol = "₹",
             FontFamily = "Roboto",
