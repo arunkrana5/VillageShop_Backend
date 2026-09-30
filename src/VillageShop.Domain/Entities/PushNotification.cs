@@ -24,5 +24,6 @@ public class PushNotification
     public bool IsActive { get; set; } = true;
     public short isdeleted { get; set; } = 0;
     public string IPAddress { get; set; } = "127.0.0.1";
+    [NotMapped]
     public long? TenantId { get; set; } = 1;
 }
