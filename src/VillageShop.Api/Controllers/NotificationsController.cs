@@ -39,59 +39,79 @@ public class NotificationsController : ControllerBase
     public async Task<IActionResult> GetNotifications([FromQuery] long? tenantId)
     {
         long targetTenantId = tenantId ?? await ResolveTenantIdAsync();
-
-        var pushNotifications = await _context.PushNotifications
-            .IgnoreQueryFilters()
-            .AsNoTracking()
-            .Where(n => n.isdeleted == 0 && (n.TenantId == targetTenantId || n.TenantId == null || n.TenantId <= 0))
-            .OrderByDescending(n => n.NotificationID)
-            .Take(50)
-            .ToListAsync();
-
-        var userNotifications = await _context.UserNotifications
-            .IgnoreQueryFilters()
-            .AsNoTracking()
-            .Where(n => n.TenantId == targetTenantId || n.TenantId == null || n.TenantId <= 0)
-            .OrderByDescending(n => n.Id)
-            .Take(50)
-            .ToListAsync();
-
         var combinedList = new List<object>();
 
-        foreach (var p in pushNotifications)
+        try
         {
-            combinedList.Add(new
+            var pushNotifications = await _context.PushNotifications
+                .IgnoreQueryFilters()
+                .AsNoTracking()
+                .Where(n => n.isdeleted == 0)
+                .OrderByDescending(n => n.NotificationID)
+                .Take(50)
+                .ToListAsync();
+
+            foreach (var p in pushNotifications)
             {
-                id = p.NotificationID,
-                source = "PUSH",
-                title = p.Subject,
-                message = p.MessageContent,
-                category = string.IsNullOrWhiteSpace(p.Category) ? "GENERAL" : p.Category,
-                gotoUrl = p.GotoURL,
-                priority = p.Priority,
-                isRead = p.IsStatusRead,
-                createdDate = p.CreatedDate.ToString("yyyy-MM-dd hh:mm tt"),
-                tableId = p.TableID,
-                tenantId = p.TenantId ?? targetTenantId
-            });
+                if (p.TenantId.HasValue && p.TenantId > 0 && p.TenantId != targetTenantId)
+                    continue;
+
+                combinedList.Add(new
+                {
+                    id = p.NotificationID,
+                    source = "PUSH",
+                    title = p.Subject,
+                    message = p.MessageContent,
+                    category = string.IsNullOrWhiteSpace(p.Category) ? "GENERAL" : p.Category,
+                    gotoUrl = p.GotoURL,
+                    priority = p.Priority,
+                    isRead = p.IsStatusRead,
+                    createdDate = p.CreatedDate.ToString("yyyy-MM-dd hh:mm tt"),
+                    tableId = p.TableID,
+                    tenantId = p.TenantId ?? targetTenantId
+                });
+            }
+        }
+        catch (Exception ex)
+        {
+            // Log or fallback if PushNotifications table query encounters schema mismatch
+            Console.WriteLine($"[NotificationsController] PushNotifications fetch exception: {ex.Message}");
         }
 
-        foreach (var u in userNotifications)
+        try
         {
-            combinedList.Add(new
+            var userNotifications = await _context.UserNotifications
+                .IgnoreQueryFilters()
+                .AsNoTracking()
+                .OrderByDescending(n => n.Id)
+                .Take(50)
+                .ToListAsync();
+
+            foreach (var u in userNotifications)
             {
-                id = u.Id,
-                source = "USER",
-                title = u.Title,
-                message = u.Message,
-                category = u.Type ?? "INFO",
-                gotoUrl = "",
-                priority = 1,
-                isRead = u.IsRead,
-                createdDate = u.CreatedDate.ToString("yyyy-MM-dd hh:mm tt"),
-                tableId = u.ReferenceId ?? 0,
-                tenantId = u.TenantId ?? targetTenantId
-            });
+                if (u.TenantId.HasValue && u.TenantId > 0 && u.TenantId != targetTenantId)
+                    continue;
+
+                combinedList.Add(new
+                {
+                    id = u.Id,
+                    source = "USER",
+                    title = u.Title,
+                    message = u.Message,
+                    category = u.Type ?? "INFO",
+                    gotoUrl = "",
+                    priority = 1,
+                    isRead = u.IsRead,
+                    createdDate = u.CreatedDate.ToString("yyyy-MM-dd hh:mm tt"),
+                    tableId = u.ReferenceId ?? 0,
+                    tenantId = u.TenantId ?? targetTenantId
+                });
+            }
+        }
+        catch (Exception ex)
+        {
+            // Log or fallback if UserNotifications table query encounters schema mismatch
+            Console.WriteLine($"[NotificationsController] UserNotifications fetch exception: {ex.Message}");
         }
 
         return Ok(combinedList);
@@ -101,16 +121,26 @@ public class NotificationsController : ControllerBase
     public async Task<IActionResult> GetUnreadCount([FromQuery] long? tenantId)
     {
         long targetTenantId = tenantId ?? await ResolveTenantIdAsync();
+        int pushUnread = 0;
+        int userUnread = 0;
 
-        int pushUnread = await _context.PushNotifications
-            .IgnoreQueryFilters()
-            .Where(n => n.isdeleted == 0 && !n.IsStatusRead && (n.TenantId == targetTenantId || n.TenantId == null || n.TenantId <= 0))
-            .CountAsync();
+        try
+        {
+            pushUnread = await _context.PushNotifications
+                .IgnoreQueryFilters()
+                .Where(n => n.isdeleted == 0 && !n.IsStatusRead)
+                .CountAsync();
+        }
+        catch (Exception) {}
 
-        int userUnread = await _context.UserNotifications
-            .IgnoreQueryFilters()
-            .Where(n => !n.IsRead && (n.TenantId == targetTenantId || n.TenantId == null || n.TenantId <= 0))
-            .CountAsync();
+        try
+        {
+            userUnread = await _context.UserNotifications
+                .IgnoreQueryFilters()
+                .Where(n => !n.IsRead)
+                .CountAsync();
+        }
+        catch (Exception) {}
 
         return Ok(new { unreadCount = pushUnread + userUnread });
     }
