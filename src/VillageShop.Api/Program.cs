@@ -172,6 +172,44 @@ BEGIN
     END
 END";
             db.Database.ExecuteSqlRaw(createVStockSql);
+
+            var alterVCustomersSql = @"
+IF EXISTS (SELECT * FROM sys.tables WHERE name = 'V_Customers')
+BEGIN
+    IF NOT EXISTS (SELECT * FROM sys.columns WHERE object_id = OBJECT_ID('V_Customers') AND name = 'Email')
+    BEGIN
+        ALTER TABLE [V_Customers] ADD [Email] nvarchar(max) NULL;
+    END
+    IF NOT EXISTS (SELECT * FROM sys.columns WHERE object_id = OBJECT_ID('V_Customers') AND name = 'WhatsApp')
+    BEGIN
+        ALTER TABLE [V_Customers] ADD [WhatsApp] nvarchar(max) NULL;
+    END
+    IF NOT EXISTS (SELECT * FROM sys.columns WHERE object_id = OBJECT_ID('V_Customers') AND name = 'FatherName')
+    BEGIN
+        ALTER TABLE [V_Customers] ADD [FatherName] nvarchar(max) NULL;
+    END
+    IF NOT EXISTS (SELECT * FROM sys.columns WHERE object_id = OBJECT_ID('V_Customers') AND name = 'Address')
+    BEGIN
+        ALTER TABLE [V_Customers] ADD [Address] nvarchar(max) NULL;
+    END
+    IF NOT EXISTS (SELECT * FROM sys.columns WHERE object_id = OBJECT_ID('V_Customers') AND name = 'PO')
+    BEGIN
+        ALTER TABLE [V_Customers] ADD [PO] nvarchar(max) NULL;
+    END
+    IF NOT EXISTS (SELECT * FROM sys.columns WHERE object_id = OBJECT_ID('V_Customers') AND name = 'PS')
+    BEGIN
+        ALTER TABLE [V_Customers] ADD [PS] nvarchar(max) NULL;
+    END
+    IF NOT EXISTS (SELECT * FROM sys.columns WHERE object_id = OBJECT_ID('V_Customers') AND name = 'Dist')
+    BEGIN
+        ALTER TABLE [V_Customers] ADD [Dist] nvarchar(max) NULL;
+    END
+    IF NOT EXISTS (SELECT * FROM sys.columns WHERE object_id = OBJECT_ID('V_Customers') AND name = 'Pincode')
+    BEGIN
+        ALTER TABLE [V_Customers] ADD [Pincode] nvarchar(max) NULL;
+    END
+END";
+            db.Database.ExecuteSqlRaw(alterVCustomersSql);
         }
         catch (Exception) {}
 
