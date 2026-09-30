@@ -140,4 +140,34 @@ public class SalesController : ControllerBase
             }).ToList()
         });
     }
+
+    [HttpDelete("{id}")]
+    public async Task<IActionResult> DeleteSale(string id)
+    {
+        var sale = await _context.Sales
+            .IgnoreQueryFilters()
+            .FirstOrDefaultAsync(s => s.InvoiceNumber == id || s.ID.ToString() == id);
+
+        if (sale != null)
+        {
+            _context.Sales.Remove(sale);
+            await _context.SaveChangesAsync();
+            return Ok(PostResponse.Success("Sale deleted successfully."));
+        }
+        return NotFound(PostResponse.Error("Sale not found.", 404));
+    }
+
+    [HttpDelete("clear-all")]
+    public async Task<IActionResult> ClearAllSales([FromQuery] long? tenantId)
+    {
+        var salesQuery = _context.Sales.IgnoreQueryFilters().AsQueryable();
+        if (tenantId.HasValue && tenantId.Value > 0)
+        {
+            salesQuery = salesQuery.Where(s => s.TenantId == tenantId.Value);
+        }
+        var sales = await salesQuery.ToListAsync();
+        _context.Sales.RemoveRange(sales);
+        await _context.SaveChangesAsync();
+        return Ok(PostResponse.Success($"Cleared {sales.Count} sales records."));
+    }
 }
