@@ -18,6 +18,5 @@ public class UserNotification
     public bool IsRead { get; set; } = false;
     public DateTime CreatedDate { get; set; } = DateTime.UtcNow;
     public DateTime? ReadDate { get; set; }
-    [NotMapped]
-    public long? TenantId { get; set; }
+    public long TenantId { get; set; } = 1;
 }

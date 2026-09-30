@@ -47,16 +47,13 @@ public class NotificationsController : ControllerBase
             var pushNotifications = await _context.PushNotifications
                 .IgnoreQueryFilters()
                 .AsNoTracking()
-                .Where(n => n.isdeleted == 0)
+                .Where(n => n.isdeleted == 0 && (n.TenantId == targetTenantId || n.TenantId <= 0))
                 .OrderByDescending(n => n.NotificationID)
                 .Take(50)
                 .ToListAsync();
 
             foreach (var p in pushNotifications)
             {
-                if (p.TenantId.HasValue && p.TenantId > 0 && p.TenantId != targetTenantId)
-                    continue;
-
                 combinedList.Add(new
                 {
                     id = p.NotificationID,
@@ -69,7 +66,7 @@ public class NotificationsController : ControllerBase
                     isRead = p.IsStatusRead,
                     createdDate = p.CreatedDate.ToString("yyyy-MM-dd hh:mm tt"),
                     tableId = p.TableID,
-                    tenantId = p.TenantId ?? targetTenantId
+                    tenantId = p.TenantId
                 });
             }
         }
@@ -83,15 +80,13 @@ public class NotificationsController : ControllerBase
             var userNotifications = await _context.UserNotifications
                 .IgnoreQueryFilters()
                 .AsNoTracking()
+                .Where(u => u.TenantId == targetTenantId || u.TenantId <= 0)
                 .OrderByDescending(n => n.Id)
                 .Take(50)
                 .ToListAsync();
 
             foreach (var u in userNotifications)
             {
-                if (u.TenantId.HasValue && u.TenantId > 0 && u.TenantId != targetTenantId)
-                    continue;
-
                 combinedList.Add(new
                 {
                     id = u.Id,
@@ -104,7 +99,7 @@ public class NotificationsController : ControllerBase
                     isRead = u.IsRead,
                     createdDate = u.CreatedDate.ToString("yyyy-MM-dd hh:mm tt"),
                     tableId = u.ReferenceId ?? 0,
-                    tenantId = u.TenantId ?? targetTenantId
+                    tenantId = u.TenantId
                 });
             }
         }
