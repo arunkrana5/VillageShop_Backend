@@ -221,34 +221,63 @@ public class NotificationsController : ControllerBase
         long targetTenantId = tenantId ?? await ResolveTenantIdAsync();
 
         if (req == null) req = new CreateNotificationRequest();
+        string title = string.IsNullOrWhiteSpace(req.Subject) ? (req.Title ?? "Alert") : req.Subject;
+        string message = string.IsNullOrWhiteSpace(req.MessageContent) ? (req.Message ?? "New Notification") : req.MessageContent;
+        string category = string.IsNullOrWhiteSpace(req.Category) ? "SYSTEM" : req.Category;
 
-        int nextId = 1;
+        int createdId = 0;
+
         try
         {
-            nextId = (await _context.PushNotifications.IgnoreQueryFilters().MaxAsync(p => (int?)p.NotificationID) ?? 0) + 1;
+            int nextId = (await _context.PushNotifications.IgnoreQueryFilters().MaxAsync(p => (int?)p.NotificationID) ?? 0) + 1;
+            var pushNotif = new PushNotification
+            {
+                NotificationID = nextId,
+                Subject = title,
+                MessageContent = message,
+                Category = category,
+                GotoURL = req.GotoURL ?? "",
+                Priority = req.Priority > 0 ? req.Priority : 1,
+                IsStatusRead = false,
+                CreatedDate = DateTime.UtcNow,
+                TenantId = targetTenantId,
+                IsActive = true,
+                IsRecent = true,
+                isdeleted = 0
+            };
+
+            _context.PushNotifications.Add(pushNotif);
+            await _context.SaveChangesAsync();
+            createdId = pushNotif.NotificationID;
         }
-        catch (Exception) {}
-
-        var pushNotif = new PushNotification
+        catch (Exception ex)
         {
-            NotificationID = nextId,
-            Subject = string.IsNullOrWhiteSpace(req.Subject) ? (req.Title ?? "Alert") : req.Subject,
-            MessageContent = string.IsNullOrWhiteSpace(req.MessageContent) ? (req.Message ?? "New Notification") : req.MessageContent,
-            Category = string.IsNullOrWhiteSpace(req.Category) ? "SYSTEM" : req.Category,
-            GotoURL = req.GotoURL ?? "",
-            Priority = req.Priority > 0 ? req.Priority : 1,
-            IsStatusRead = false,
-            CreatedDate = DateTime.UtcNow,
-            TenantId = targetTenantId,
-            IsActive = true,
-            IsRecent = true,
-            isdeleted = 0
-        };
+            Console.WriteLine($"[NotificationsController] PushNotification create exception: {ex.Message}");
+        }
 
-        _context.PushNotifications.Add(pushNotif);
-        await _context.SaveChangesAsync();
+        try
+        {
+            var userNotif = new UserNotification
+            {
+                Title = title,
+                Message = message,
+                Type = category,
+                IsRead = false,
+                CreatedDate = DateTime.UtcNow,
+                TenantId = targetTenantId,
+                LoginID = 1
+            };
 
-        return Ok(PostResponse.Success("Notification created & sent successfully.", pushNotif.NotificationID));
+            _context.UserNotifications.Add(userNotif);
+            await _context.SaveChangesAsync();
+            if (createdId == 0) createdId = userNotif.Id;
+        }
+        catch (Exception ex)
+        {
+            Console.WriteLine($"[NotificationsController] UserNotification create exception: {ex.Message}");
+        }
+
+        return Ok(PostResponse.Success("Notification created & sent successfully.", createdId));
     }
 
     [HttpPut("{id}/read")]

@@ -50,7 +50,7 @@ public class ApplicationDbContext : DbContext, IApplicationDbContext
         foreach (var entityType in modelBuilder.Model.GetEntityTypes())
         {
             var tableName = entityType.GetTableName();
-            if (!string.IsNullOrEmpty(tableName) && !tableName.StartsWith("V_"))
+            if (!string.IsNullOrEmpty(tableName) && !tableName.StartsWith("V_", StringComparison.OrdinalIgnoreCase))
             {
                 entityType.SetTableName("V_" + tableName);
             }
