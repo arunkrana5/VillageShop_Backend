@@ -19,5 +19,5 @@ public class UserNotification
     public DateTime CreatedDate { get; set; } = DateTime.UtcNow;
     public DateTime? ReadDate { get; set; }
     [NotMapped]
-    public long? TenantId { get; set; } = 1;
+    public long? TenantId { get; set; }
 }
