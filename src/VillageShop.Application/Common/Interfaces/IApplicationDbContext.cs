@@ -25,6 +25,8 @@ public interface IApplicationDbContext
     DbSet<UdhaarLedger> UdhaarLedgers { get; }
     DbSet<Expense> Expenses { get; }
     DbSet<SyncQueue> SyncQueues { get; }
+    DbSet<PushNotification> PushNotifications { get; }
+    DbSet<UserNotification> UserNotifications { get; }
 
     Task<int> SaveChangesAsync(CancellationToken cancellationToken = default);
 }

@@ -36,6 +36,8 @@ public class ApplicationDbContext : DbContext, IApplicationDbContext
     public DbSet<UdhaarLedger> UdhaarLedgers => Set<UdhaarLedger>();
     public DbSet<Expense> Expenses => Set<Expense>();
     public DbSet<SyncQueue> SyncQueues => Set<SyncQueue>();
+    public DbSet<PushNotification> PushNotifications => Set<PushNotification>();
+    public DbSet<UserNotification> UserNotifications => Set<UserNotification>();
 
     public long CurrentTenantId => _currentTenantService != null && _currentTenantService.TenantId > 0 ? _currentTenantService.TenantId : 1;
     public bool IsSuperAdmin => _currentTenantService?.IsSuperAdmin ?? false;
