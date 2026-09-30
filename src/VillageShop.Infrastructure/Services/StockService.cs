@@ -67,30 +67,29 @@ public class StockService : IStockService
 
     public async Task<PostResponse> UpdateAsync(UpdateStockInRequest request)
     {
-        var product = await _context.Products.IgnoreQueryFilters().FirstOrDefaultAsync(p => p.ID == request.ID && !p.IsDeleted);
+        var product = await _context.Products.IgnoreQueryFilters().FirstOrDefaultAsync(p => (request.ID > 0 && p.ID == request.ID) || (!string.IsNullOrWhiteSpace(request.Name) && p.Name.ToLower() == request.Name.ToLower()) && !p.IsDeleted);
         if (product == null)
         {
             return PostResponse.Error("Stock item not found.", 404);
         }
 
-        product.ItemId = request.ItemId;
-        product.Name = request.Name;
-        product.Category = request.Category;
-        product.Brand = request.Brand;
-        product.Unit = string.IsNullOrWhiteSpace(request.Unit) ? "pcs" : request.Unit;
-        product.Barcode = request.Barcode;
-        product.PurchasePrice = request.PurchasePrice;
-        product.SellingPrice = request.SellingPrice;
-        product.MRP = request.MRP > 0 ? request.MRP : request.SellingPrice;
-        product.GSTPercent = request.GSTPercent;
-        product.OpeningStock = request.OpeningStock;
-        product.CurrentStock = request.CurrentStock ?? request.OpeningStock;
-        product.MinimumStock = request.MinimumStock;
-        product.BatchNumber = request.BatchNumber;
-        product.RackNumber = request.RackNumber;
-        product.ExpiryDate = request.ExpiryDate;
-        product.HSNCode = request.HSNCode;
-        product.ImageUrl = request.ImageUrl;
+        if (!string.IsNullOrWhiteSpace(request.Name)) product.Name = request.Name;
+        if (request.ItemId.HasValue && request.ItemId > 0) product.ItemId = request.ItemId;
+        if (!string.IsNullOrWhiteSpace(request.Category)) product.Category = request.Category;
+        if (!string.IsNullOrWhiteSpace(request.Brand)) product.Brand = request.Brand;
+        if (!string.IsNullOrWhiteSpace(request.Unit)) product.Unit = request.Unit;
+        if (!string.IsNullOrWhiteSpace(request.Barcode)) product.Barcode = request.Barcode;
+        if (request.PurchasePrice > 0) product.PurchasePrice = request.PurchasePrice;
+        if (request.SellingPrice > 0) product.SellingPrice = request.SellingPrice;
+        if (request.MRP > 0) product.MRP = request.MRP;
+        if (request.GSTPercent > 0) product.GSTPercent = request.GSTPercent;
+        if (request.CurrentStock.HasValue) product.CurrentStock = request.CurrentStock.Value;
+        if (request.MinimumStock > 0) product.MinimumStock = request.MinimumStock;
+        if (!string.IsNullOrWhiteSpace(request.BatchNumber)) product.BatchNumber = request.BatchNumber;
+        if (!string.IsNullOrWhiteSpace(request.RackNumber)) product.RackNumber = request.RackNumber;
+        if (request.ExpiryDate.HasValue) product.ExpiryDate = request.ExpiryDate;
+        if (!string.IsNullOrWhiteSpace(request.HSNCode)) product.HSNCode = request.HSNCode;
+        if (!string.IsNullOrWhiteSpace(request.ImageUrl)) product.ImageUrl = request.ImageUrl;
 
         await _context.SaveChangesAsync();
         return PostResponse.Success($"Stock item '{product.Name}' updated successfully.", product.ID);

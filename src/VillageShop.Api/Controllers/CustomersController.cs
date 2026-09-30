@@ -61,7 +61,15 @@ public class CustomersController : ControllerBase
                 tenantId = c.TenantId,
                 name = c.Name,
                 phone = c.Mobile ?? "",
-                village = c.Village ?? "Rampur",
+                email = c.Email ?? "",
+                whatsapp = c.WhatsApp ?? "",
+                fatherName = c.FatherName ?? "",
+                address = c.Address ?? "",
+                village = c.Village ?? "",
+                po = c.PO ?? "",
+                ps = c.PS ?? "",
+                dist = c.Dist ?? "",
+                pincode = c.Pincode ?? "",
                 udhaar = (double)c.CurrentBalance,
                 lastTx = c.ModifiedDate.ToString("dd MMM yyyy"),
                 status = c.CurrentBalance > 0 ? "PENDING_CREDIT" : "COMPLETED"
@@ -104,8 +112,16 @@ public class CustomersController : ControllerBase
             TenantId = targetTenantId,
             Name = request.Name,
             Mobile = request.Phone,
-            Village = string.IsNullOrWhiteSpace(request.Village) ? "Rampur" : request.Village,
-            CurrentBalance = 0.00m
+            Email = request.Email,
+            WhatsApp = request.WhatsApp,
+            FatherName = request.FatherName,
+            Address = request.Address,
+            Village = request.Village,
+            PO = request.PO,
+            PS = request.PS,
+            Dist = request.Dist,
+            Pincode = request.Pincode,
+            CurrentBalance = (decimal)(request.Udhaar ?? 0)
         };
 
         _context.Customers.Add(customer);
@@ -114,18 +130,37 @@ public class CustomersController : ControllerBase
         return Ok(PostResponse.Success($"Customer '{request.Name}' saved successfully under Tenant #{targetTenantId}.", customer.ID));
     }
 
-    [HttpPut("{id}")]
-    public async Task<IActionResult> UpdateCustomer(long id, [FromBody] CustomerCreateRequest request)
+    [HttpPut("{identifier}")]
+    public async Task<IActionResult> UpdateCustomer(string identifier, [FromBody] CustomerCreateRequest request)
     {
-        var customer = await _context.Customers.IgnoreQueryFilters().FirstOrDefaultAsync(c => c.ID == id && !c.IsDeleted);
+        Customer? customer = null;
+        if (long.TryParse(identifier, out long id))
+        {
+            customer = await _context.Customers.IgnoreQueryFilters().FirstOrDefaultAsync(c => c.ID == id && !c.IsDeleted);
+        }
+        
+        if (customer == null)
+        {
+            customer = await _context.Customers.IgnoreQueryFilters().FirstOrDefaultAsync(c => c.Name.ToLower() == identifier.ToLower() && !c.IsDeleted);
+        }
+
         if (customer == null) return NotFound(PostResponse.Error("Customer not found.", 404));
 
-        customer.Name = request.Name;
-        customer.Mobile = request.Phone;
-        customer.Village = string.IsNullOrWhiteSpace(request.Village) ? "Rampur" : request.Village;
+        if (!string.IsNullOrWhiteSpace(request.Name)) customer.Name = request.Name;
+        if (!string.IsNullOrWhiteSpace(request.Phone)) customer.Mobile = request.Phone;
+        if (request.Email != null) customer.Email = request.Email;
+        if (request.WhatsApp != null) customer.WhatsApp = request.WhatsApp;
+        if (request.FatherName != null) customer.FatherName = request.FatherName;
+        if (request.Address != null) customer.Address = request.Address;
+        if (request.Village != null) customer.Village = request.Village;
+        if (request.PO != null) customer.PO = request.PO;
+        if (request.PS != null) customer.PS = request.PS;
+        if (request.Dist != null) customer.Dist = request.Dist;
+        if (request.Pincode != null) customer.Pincode = request.Pincode;
+        if (request.Udhaar.HasValue) customer.CurrentBalance = (decimal)request.Udhaar.Value;
 
         await _context.SaveChangesAsync();
-        return Ok(PostResponse.Success($"Customer '{request.Name}' updated successfully.", id));
+        return Ok(PostResponse.Success($"Customer '{customer.Name}' updated successfully.", customer.ID));
     }
 
     [HttpPost("payment")]
@@ -141,17 +176,28 @@ public class CustomersController : ControllerBase
         return Ok(PostResponse.Success($"Payment of ₹ {request.AmountPaid:F2} recorded for {request.CustomerName}."));
     }
 
-    [HttpDelete("{id}")]
-    public async Task<IActionResult> DeleteCustomer(long id)
+    [HttpDelete("{identifier}")]
+    public async Task<IActionResult> DeleteCustomer(string identifier)
     {
-        var customer = await _context.Customers.IgnoreQueryFilters().FirstOrDefaultAsync(c => c.ID == id && !c.IsDeleted);
+        Customer? customer = null;
+        if (long.TryParse(identifier, out long id))
+        {
+            customer = await _context.Customers.IgnoreQueryFilters().FirstOrDefaultAsync(c => c.ID == id && !c.IsDeleted);
+        }
+
+        if (customer == null)
+        {
+            customer = await _context.Customers.IgnoreQueryFilters().FirstOrDefaultAsync(c => c.Name.ToLower() == identifier.ToLower() && !c.IsDeleted);
+        }
+
         if (customer != null)
         {
             customer.IsDeleted = true;
             customer.DeletedDate = DateTime.UtcNow;
             await _context.SaveChangesAsync();
+            return Ok(PostResponse.Success("Customer deleted successfully.", customer.ID));
         }
-        return Ok(PostResponse.Success("Customer deleted successfully.", id));
+        return NotFound(PostResponse.Error("Customer not found for deletion.", 404));
     }
 }
 
@@ -161,7 +207,16 @@ public class CustomerCreateRequest
     public string? TenantCode { get; set; }
     public string Name { get; set; } = string.Empty;
     public string Phone { get; set; } = string.Empty;
-    public string Village { get; set; } = string.Empty;
+    public string? Email { get; set; }
+    public string? WhatsApp { get; set; }
+    public string? FatherName { get; set; }
+    public string? Address { get; set; }
+    public string? Village { get; set; }
+    public string? PO { get; set; }
+    public string? PS { get; set; }
+    public string? Dist { get; set; }
+    public string? Pincode { get; set; }
+    public double? Udhaar { get; set; }
 }
 
 public class CustomerPaymentRequest

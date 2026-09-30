@@ -12,6 +12,20 @@ public class Customer : BaseTenantEntity
 
     public string? Village { get; set; }
 
+    public string? Email { get; set; }
+
+    public string? WhatsApp { get; set; }
+
+    public string? FatherName { get; set; }
+
+    public string? PO { get; set; }
+
+    public string? PS { get; set; }
+
+    public string? Dist { get; set; }
+
+    public string? Pincode { get; set; }
+
     public decimal CreditLimit { get; set; }
 
     public decimal OpeningBalance { get; set; }

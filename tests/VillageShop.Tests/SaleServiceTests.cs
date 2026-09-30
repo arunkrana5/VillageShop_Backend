@@ -39,7 +39,7 @@ public class SaleServiceTests
         var saleService = new SaleService(context);
 
         // Seed product
-        var product = new Product
+        var product = new Stock
         {
             TenantId = 1,
             Name = "Basmati Rice 5kg",
