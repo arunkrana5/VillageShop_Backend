@@ -222,8 +222,16 @@ public class NotificationsController : ControllerBase
 
         if (req == null) req = new CreateNotificationRequest();
 
+        int nextId = 1;
+        try
+        {
+            nextId = (await _context.PushNotifications.IgnoreQueryFilters().MaxAsync(p => (int?)p.NotificationID) ?? 0) + 1;
+        }
+        catch (Exception) {}
+
         var pushNotif = new PushNotification
         {
+            NotificationID = nextId,
             Subject = string.IsNullOrWhiteSpace(req.Subject) ? (req.Title ?? "Alert") : req.Subject,
             MessageContent = string.IsNullOrWhiteSpace(req.MessageContent) ? (req.Message ?? "New Notification") : req.MessageContent,
             Category = string.IsNullOrWhiteSpace(req.Category) ? "SYSTEM" : req.Category,

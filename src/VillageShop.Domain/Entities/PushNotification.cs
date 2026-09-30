@@ -8,6 +8,7 @@ namespace VillageShop.Domain.Entities;
 public class PushNotification
 {
     [Key]
+    [DatabaseGenerated(DatabaseGeneratedOption.None)]
     public int NotificationID { get; set; }
     public string Subject { get; set; } = string.Empty;
     public string MessageContent { get; set; } = string.Empty;
