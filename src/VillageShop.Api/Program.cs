@@ -124,6 +124,54 @@ BEGIN
     );
 END";
             db.Database.ExecuteSqlRaw(createVItemsSql);
+
+            var createVStockSql = @"
+IF NOT EXISTS (SELECT * FROM sys.tables WHERE name = 'V_Stock')
+BEGIN
+    CREATE TABLE [V_Stock] (
+        [ID] bigint IDENTITY(1,1) NOT NULL,
+        [TenantId] bigint NOT NULL,
+        [ItemId] bigint NULL,
+        [ProductCode] nvarchar(100) NOT NULL,
+        [Name] nvarchar(250) NOT NULL,
+        [Category] nvarchar(150) NULL,
+        [Brand] nvarchar(150) NULL,
+        [Unit] nvarchar(50) NOT NULL DEFAULT 'pcs',
+        [Barcode] nvarchar(100) NULL,
+        [PurchasePrice] decimal(18,2) NOT NULL DEFAULT 0,
+        [SellingPrice] decimal(18,2) NOT NULL DEFAULT 0,
+        [MRP] decimal(18,2) NOT NULL DEFAULT 0,
+        [GSTPercent] decimal(5,2) NOT NULL DEFAULT 0,
+        [OpeningStock] decimal(18,3) NOT NULL DEFAULT 0,
+        [MinimumStock] decimal(18,3) NOT NULL DEFAULT 0,
+        [CurrentStock] decimal(18,3) NOT NULL DEFAULT 0,
+        [BatchNumber] nvarchar(100) NULL,
+        [RackNumber] nvarchar(100) NULL,
+        [ExpiryDate] datetime2 NULL,
+        [HSNCode] nvarchar(100) NULL,
+        [ImageUrl] nvarchar(max) NULL,
+        [IsActive] bit NOT NULL DEFAULT 1,
+        [IsDeleted] bit NOT NULL DEFAULT 0,
+        [Priority] int NOT NULL DEFAULT 0,
+        [CreatedBy] bigint NOT NULL DEFAULT 0,
+        [CreatedDate] datetime2 NOT NULL DEFAULT GETUTCDATE(),
+        [ModifiedBy] bigint NOT NULL DEFAULT 0,
+        [ModifiedDate] datetime2 NOT NULL DEFAULT GETUTCDATE(),
+        [DeletedBy] bigint NOT NULL DEFAULT 0,
+        [DeletedDate] datetime2 NULL,
+        [EntrySource] nvarchar(100) NOT NULL DEFAULT '',
+        [IPAddress] nvarchar(100) NOT NULL DEFAULT '',
+        CONSTRAINT [PK_V_Stock] PRIMARY KEY CLUSTERED ([ID] ASC)
+    );
+END
+ELSE
+BEGIN
+    IF NOT EXISTS (SELECT * FROM sys.columns WHERE object_id = OBJECT_ID('V_Stock') AND name = 'ItemId')
+    BEGIN
+        ALTER TABLE [V_Stock] ADD [ItemId] bigint NULL;
+    END
+END";
+            db.Database.ExecuteSqlRaw(createVStockSql);
         }
         catch (Exception) {}
 
