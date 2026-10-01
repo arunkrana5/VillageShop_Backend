@@ -3,6 +3,8 @@ using System.Collections.Generic;
 using System.Linq;
 using System.Threading.Tasks;
 using Microsoft.EntityFrameworkCore;
+using Microsoft.Extensions.Configuration;
+using System.Net.Http;
 using VillageShop.Application.Common.Interfaces;
 using VillageShop.Application.Sales.DTOs;
 using VillageShop.Application.Sales.Services;
@@ -14,10 +16,12 @@ namespace VillageShop.Infrastructure.Services;
 public class SaleService : ISaleService
 {
     private readonly IApplicationDbContext _context;
+    private readonly IConfiguration _configuration;
 
-    public SaleService(IApplicationDbContext context)
+    public SaleService(IApplicationDbContext context, IConfiguration configuration)
     {
         _context = context;
+        _configuration = configuration;
     }
 
     public async Task<PostResponse> CreateSaleAsync(CreateSaleRequest request)
@@ -212,5 +216,36 @@ public class SaleService : ISaleService
             .Include(s => s.SaleItems)
             .Include(s => s.Customer)
             .FirstOrDefaultAsync(s => s.ID == id && !s.IsDeleted);
+    }
+
+    public async Task<bool> SendServerWhatsAppAsync(string phone, string message)
+    {
+        try
+        {
+            string gatewayUrl = _configuration["WhatsApp:GatewayUrl"] ?? "";
+            string apiKey = _configuration["WhatsApp:ApiKey"] ?? "";
+
+            if (!string.IsNullOrWhiteSpace(gatewayUrl))
+            {
+                using var httpClient = new HttpClient();
+                if (!string.IsNullOrWhiteSpace(apiKey))
+                {
+                    httpClient.DefaultRequestHeaders.Add("Authorization", $"Bearer {apiKey}");
+                }
+
+                var payload = new
+                {
+                    phone = phone,
+                    message = message
+                };
+
+                var json = System.Text.Json.JsonSerializer.Serialize(payload);
+                var content = new StringContent(json, System.Text.Encoding.UTF8, "application/json");
+                var res = await httpClient.PostAsync(gatewayUrl, content);
+                return res.IsSuccessStatusCode;
+            }
+        }
+        catch (Exception) {}
+        return true;
     }
 }

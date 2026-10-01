@@ -2,6 +2,7 @@ using System;
 using System.Collections.Generic;
 using System.Threading.Tasks;
 using Microsoft.EntityFrameworkCore;
+using Microsoft.Extensions.Configuration;
 using VillageShop.Application.Common.Interfaces;
 using VillageShop.Application.Sales.DTOs;
 using VillageShop.Domain.Entities;
@@ -36,7 +37,8 @@ public class SaleServiceTests
     public async Task CreateSaleAsync_EnforcesIdempotency_WhenDuplicateClientTransactionIdReceived()
     {
         var context = GetInMemoryDbContext();
-        var saleService = new SaleService(context);
+        var config = new ConfigurationBuilder().Build();
+        var saleService = new SaleService(context, config);
 
         // Seed product
         var product = new Stock

@@ -184,4 +184,28 @@ public class SalesController : ControllerBase
         await _context.SaveChangesAsync();
         return Ok(PostResponse.Success($"Cleared {sales.Count} sales records."));
     }
+
+    [HttpPost("send-whatsapp")]
+    public async Task<IActionResult> SendWhatsAppGateway([FromBody] SendWhatsAppRequest request)
+    {
+        if (request == null || string.IsNullOrWhiteSpace(request.Phone) || string.IsNullOrWhiteSpace(request.Message))
+        {
+            return BadRequest(PostResponse.Error("Phone number and message content are required.", 400));
+        }
+
+        string cleanPhone = new string(request.Phone.Where(char.IsDigit).ToArray());
+        if (!cleanPhone.StartsWith("91") && cleanPhone.Length == 10)
+        {
+            cleanPhone = "91" + cleanPhone;
+        }
+
+        bool sent = await _saleService.SendServerWhatsAppAsync(cleanPhone, request.Message);
+        return Ok(PostResponse.Success("Server WhatsApp gateway processed message successfully for customer phone: " + cleanPhone));
+    }
+}
+
+public class SendWhatsAppRequest
+{
+    public string Phone { get; set; } = string.Empty;
+    public string Message { get; set; } = string.Empty;
 }
