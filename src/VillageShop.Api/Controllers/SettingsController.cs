@@ -103,8 +103,10 @@ public class SettingsController : ControllerBase
     [HttpPut]
     [HttpPost("mobile-config")]
     [HttpPost("config")]
+    [HttpPost("publish")]
     [HttpPut("mobile-config")]
     [HttpPut("config")]
+    [HttpPut("publish")]
     public async Task<IActionResult> UpdateMobileConfig([FromBody] MobileTenantConfig newConfig, [FromQuery] long? tenantId, [FromQuery] string? tenantCode)
     {
         if (newConfig == null) newConfig = new MobileTenantConfig();
@@ -699,7 +701,10 @@ public class SettingsController : ControllerBase
             buttonBgColorHex = defaultConfig.ButtonBgColorHex,
             buttonBgColor = defaultConfig.ButtonBgColorHex,
             buttonTextColorHex = defaultConfig.ButtonTextColorHex,
-            buttonTextColor = defaultConfig.ButtonTextColorHex
+            buttonTextColor = defaultConfig.ButtonTextColorHex,
+            whatsappGatewayUrl = defaultConfig.WhatsappGatewayUrl,
+            whatsappInstanceId = defaultConfig.WhatsappInstanceId,
+            whatsappApiKey = defaultConfig.WhatsappApiKey
         };
 
         var featureObj = new
@@ -777,6 +782,9 @@ public class SettingsController : ControllerBase
             SupportEmail = !string.IsNullOrWhiteSpace(tenantDbRecord?.TenantCode) ? $"support@{tenantDbRecord.TenantCode.ToLower()}.com" : "support@store.com",
             SupportWhatsapp = tMobile,
             SupportHours = "9:00 AM - 9:00 PM",
+            WhatsappGatewayUrl = "https://api.green-api.com/waInstance{idInstance}/sendMessage/{apiTokenInstance}",
+            WhatsappInstanceId = "710722753006",
+            WhatsappApiKey = "40384666e75948e28b0c4cb889b316af924f0738a9614f6e8c",
             OwnerName = tOwner,
             OwnerPhone = tMobile,
             Plan = "Enterprise SaaS",
