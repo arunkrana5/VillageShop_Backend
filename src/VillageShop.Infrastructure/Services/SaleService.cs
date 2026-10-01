@@ -227,27 +227,28 @@ public class SaleService : ISaleService
             string instanceId = _configuration["WhatsApp:InstanceId"] ?? "";
 
             // 1. Prioritize Database TenantConfiguration table (V_TenantConfigurations)
-            if (tenantId > 0)
-            {
-                var dbConfig = await _context.TenantConfigurations
-                    .IgnoreQueryFilters()
-                    .AsNoTracking()
-                    .FirstOrDefaultAsync(c => c.TenantId == tenantId && !c.IsDeleted);
+            var dbConfig = await _context.TenantConfigurations
+                .IgnoreQueryFilters()
+                .AsNoTracking()
+                .OrderByDescending(c => c.ID)
+                .FirstOrDefaultAsync(c => (tenantId <= 0 || c.TenantId == tenantId) && !c.IsDeleted);
 
-                if (dbConfig != null && !string.IsNullOrWhiteSpace(dbConfig.BrandingJson))
+            if (dbConfig != null && !string.IsNullOrWhiteSpace(dbConfig.BrandingJson))
+            {
+                try
                 {
-                    try
-                    {
-                        using var doc = System.Text.Json.JsonDocument.Parse(dbConfig.BrandingJson);
-                        if (doc.RootElement.TryGetProperty("whatsappGatewayUrl", out var gUrl) && !string.IsNullOrWhiteSpace(gUrl.GetString()))
-                            gatewayUrl = gUrl.GetString()!;
-                        if (doc.RootElement.TryGetProperty("whatsappInstanceId", out var instId) && !string.IsNullOrWhiteSpace(instId.GetString()))
-                            instanceId = instId.GetString()!;
-                        if (doc.RootElement.TryGetProperty("whatsappApiKey", out var key) && !string.IsNullOrWhiteSpace(key.GetString()))
-                            apiKey = key.GetString()!;
-                    }
-                    catch (Exception) {}
+                    using var doc = System.Text.Json.JsonDocument.Parse(dbConfig.BrandingJson);
+                    var root = doc.RootElement;
+                    
+                    var gUrl = GetJsonStringProp(root, "whatsappGatewayUrl", "WhatsappGatewayUrl", "GatewayUrl");
+                    var instId = GetJsonStringProp(root, "whatsappInstanceId", "WhatsappInstanceId", "InstanceId");
+                    var key = GetJsonStringProp(root, "whatsappApiKey", "WhatsappApiKey", "ApiKey");
+
+                    if (!string.IsNullOrWhiteSpace(gUrl)) gatewayUrl = gUrl;
+                    if (!string.IsNullOrWhiteSpace(instId)) instanceId = instId;
+                    if (!string.IsNullOrWhiteSpace(key)) apiKey = key;
                 }
+                catch (Exception) {}
             }
 
             if (!string.IsNullOrWhiteSpace(gatewayUrl))
@@ -294,5 +295,18 @@ public class SaleService : ISaleService
         }
         catch (Exception) {}
         return true;
+    }
+
+    private static string GetJsonStringProp(System.Text.Json.JsonElement root, params string[] names)
+    {
+        foreach (var name in names)
+        {
+            if (root.TryGetProperty(name, out var val) && val.ValueKind == System.Text.Json.JsonValueKind.String)
+            {
+                var s = val.GetString();
+                if (!string.IsNullOrWhiteSpace(s)) return s;
+            }
+        }
+        return "";
     }
 }

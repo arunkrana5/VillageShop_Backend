@@ -225,7 +225,7 @@ public class SettingsController : ControllerBase
                 newConfig.LowStockThreshold
             };
 
-            var brandingJsonStr = JsonSerializer.Serialize(newConfig, JsonOpts);
+            var brandingJsonStr = JsonSerializer.Serialize(brandingObj, JsonOpts);
             var featureJsonStr = JsonSerializer.Serialize(featureObj, JsonOpts);
             var menuJsonStr = JsonSerializer.Serialize(newConfig.MenuItems, JsonOpts);
 
