@@ -146,6 +146,12 @@ public class SaleService : ISaleService
         decimal calculatedTotal = (subTotal + totalTax) - request.DiscountAmount;
         decimal finalTotalAmount = request.TotalAmount > 0 ? request.TotalAmount : (request.Amount > 0 ? request.Amount : calculatedTotal);
         
+        decimal discountAmount = request.DiscountAmount;
+        if (discountAmount <= 0 && (subTotal + totalTax) > finalTotalAmount)
+        {
+            discountAmount = (subTotal + totalTax) - finalTotalAmount;
+        }
+        
         string paymentMode = string.IsNullOrWhiteSpace(request.PaymentMode) ? "Cash" : request.PaymentMode;
         decimal paidAmount = request.PaidAmount;
         if (paymentMode.Equals("Cash", StringComparison.OrdinalIgnoreCase) || paymentMode.Equals("UPI", StringComparison.OrdinalIgnoreCase))
@@ -165,7 +171,7 @@ public class SaleService : ISaleService
             SaleDate = DateTime.UtcNow,
             SubTotal = subTotal,
             TaxAmount = totalTax,
-            DiscountAmount = request.DiscountAmount,
+            DiscountAmount = discountAmount,
             TotalAmount = finalTotalAmount,
             PaidAmount = paidAmount,
             UdhaarAmount = udhaarAmount,
