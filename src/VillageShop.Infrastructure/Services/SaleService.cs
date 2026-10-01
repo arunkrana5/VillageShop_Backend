@@ -224,25 +224,48 @@ public class SaleService : ISaleService
         {
             string gatewayUrl = _configuration["WhatsApp:GatewayUrl"] ?? "";
             string apiKey = _configuration["WhatsApp:ApiKey"] ?? "";
+            string instanceId = _configuration["WhatsApp:InstanceId"] ?? "";
 
             if (!string.IsNullOrWhiteSpace(gatewayUrl))
             {
                 using var httpClient = new HttpClient();
-                if (!string.IsNullOrWhiteSpace(apiKey))
+
+                // Green-API Gateway handling
+                if (gatewayUrl.Contains("green-api.com", StringComparison.OrdinalIgnoreCase))
                 {
-                    httpClient.DefaultRequestHeaders.Add("Authorization", $"Bearer {apiKey}");
+                    string finalUrl = gatewayUrl;
+                    if (finalUrl.Contains("{idInstance}") && !string.IsNullOrWhiteSpace(instanceId))
+                        finalUrl = finalUrl.Replace("{idInstance}", instanceId);
+                    if (finalUrl.Contains("{apiTokenInstance}") && !string.IsNullOrWhiteSpace(apiKey))
+                        finalUrl = finalUrl.Replace("{apiTokenInstance}", apiKey);
+
+                    string chatId = phone.EndsWith("@c.us") ? phone : $"{phone}@c.us";
+                    var greenPayload = new { chatId = chatId, message = message };
+                    var json = System.Text.Json.JsonSerializer.Serialize(greenPayload);
+                    var content = new StringContent(json, System.Text.Encoding.UTF8, "application/json");
+                    var res = await httpClient.PostAsync(finalUrl, content);
+                    return res.IsSuccessStatusCode;
                 }
-
-                var payload = new
+                // Generic Webhook / Cloud Gateway handling
+                else
                 {
-                    phone = phone,
-                    message = message
-                };
+                    if (!string.IsNullOrWhiteSpace(apiKey))
+                    {
+                        httpClient.DefaultRequestHeaders.TryAddWithoutValidation("Authorization", $"Bearer {apiKey}");
+                    }
 
-                var json = System.Text.Json.JsonSerializer.Serialize(payload);
-                var content = new StringContent(json, System.Text.Encoding.UTF8, "application/json");
-                var res = await httpClient.PostAsync(gatewayUrl, content);
-                return res.IsSuccessStatusCode;
+                    var genericPayload = new
+                    {
+                        phone = phone,
+                        chatId = $"{phone}@c.us",
+                        message = message
+                    };
+
+                    var json = System.Text.Json.JsonSerializer.Serialize(genericPayload);
+                    var content = new StringContent(json, System.Text.Encoding.UTF8, "application/json");
+                    var res = await httpClient.PostAsync(gatewayUrl, content);
+                    return res.IsSuccessStatusCode;
+                }
             }
         }
         catch (Exception) {}
