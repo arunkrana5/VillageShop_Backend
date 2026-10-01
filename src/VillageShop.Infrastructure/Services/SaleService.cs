@@ -218,13 +218,37 @@ public class SaleService : ISaleService
             .FirstOrDefaultAsync(s => s.ID == id && !s.IsDeleted);
     }
 
-    public async Task<bool> SendServerWhatsAppAsync(string phone, string message)
+    public async Task<bool> SendServerWhatsAppAsync(string phone, string message, long tenantId = 0)
     {
         try
         {
             string gatewayUrl = _configuration["WhatsApp:GatewayUrl"] ?? "";
             string apiKey = _configuration["WhatsApp:ApiKey"] ?? "";
             string instanceId = _configuration["WhatsApp:InstanceId"] ?? "";
+
+            // 1. Prioritize Database TenantConfiguration table (V_TenantConfigurations)
+            if (tenantId > 0)
+            {
+                var dbConfig = await _context.TenantConfigurations
+                    .IgnoreQueryFilters()
+                    .AsNoTracking()
+                    .FirstOrDefaultAsync(c => c.TenantId == tenantId && !c.IsDeleted);
+
+                if (dbConfig != null && !string.IsNullOrWhiteSpace(dbConfig.BrandingJson))
+                {
+                    try
+                    {
+                        using var doc = System.Text.Json.JsonDocument.Parse(dbConfig.BrandingJson);
+                        if (doc.RootElement.TryGetProperty("whatsappGatewayUrl", out var gUrl) && !string.IsNullOrWhiteSpace(gUrl.GetString()))
+                            gatewayUrl = gUrl.GetString()!;
+                        if (doc.RootElement.TryGetProperty("whatsappInstanceId", out var instId) && !string.IsNullOrWhiteSpace(instId.GetString()))
+                            instanceId = instId.GetString()!;
+                        if (doc.RootElement.TryGetProperty("whatsappApiKey", out var key) && !string.IsNullOrWhiteSpace(key.GetString()))
+                            apiKey = key.GetString()!;
+                    }
+                    catch (Exception) {}
+                }
+            }
 
             if (!string.IsNullOrWhiteSpace(gatewayUrl))
             {

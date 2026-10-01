@@ -205,7 +205,10 @@ public class SettingsController : ControllerBase
                 supportPhone = newConfig.SupportPhone,
                 supportEmail = newConfig.SupportEmail,
                 supportWhatsapp = newConfig.SupportWhatsapp,
-                supportHours = newConfig.SupportHours
+                supportHours = newConfig.SupportHours,
+                whatsappGatewayUrl = newConfig.WhatsappGatewayUrl,
+                whatsappInstanceId = newConfig.WhatsappInstanceId,
+                whatsappApiKey = newConfig.WhatsappApiKey
             };
 
             var featureObj = new
@@ -873,6 +876,11 @@ public class MobileTenantConfig
     public string SupportEmail { get; set; } = "";
     public string SupportWhatsapp { get; set; } = "";
     public string SupportHours { get; set; } = "9:00 AM - 9:00 PM";
+
+    // WhatsApp Server Gateway Credentials (Saved in DB V_TenantConfigurations table)
+    public string WhatsappGatewayUrl { get; set; } = "https://api.green-api.com/waInstance{idInstance}/sendMessage/{apiTokenInstance}";
+    public string WhatsappInstanceId { get; set; } = "";
+    public string WhatsappApiKey { get; set; } = "";
 
     public string OwnerName { get; set; } = "";
     public string OwnerPhone { get; set; } = "";

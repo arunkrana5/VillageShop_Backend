@@ -199,13 +199,20 @@ public class SalesController : ControllerBase
             cleanPhone = "91" + cleanPhone;
         }
 
-        bool sent = await _saleService.SendServerWhatsAppAsync(cleanPhone, request.Message);
+        long targetTenantId = request.TenantId ?? 0;
+        if (targetTenantId <= 0 && Request.Headers.TryGetValue("X-Tenant-Id", out var headerTidStr) && long.TryParse(headerTidStr, out var headerTid) && headerTid > 0)
+        {
+            targetTenantId = headerTid;
+        }
+
+        bool sent = await _saleService.SendServerWhatsAppAsync(cleanPhone, request.Message, targetTenantId);
         return Ok(PostResponse.Success("Server WhatsApp gateway processed message successfully for customer phone: " + cleanPhone));
     }
 }
 
 public class SendWhatsAppRequest
 {
+    public long? TenantId { get; set; }
     public string Phone { get; set; } = string.Empty;
     public string Message { get; set; } = string.Empty;
 }
