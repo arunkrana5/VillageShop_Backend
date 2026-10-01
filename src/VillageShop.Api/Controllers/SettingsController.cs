@@ -231,7 +231,7 @@ public class SettingsController : ControllerBase
             var featureJsonStr = JsonSerializer.Serialize(featureObj, JsonOpts);
             var menuJsonStr = JsonSerializer.Serialize(newConfig.MenuItems, JsonOpts);
 
-            var existingConfig = await _context.TenantConfigurations.IgnoreQueryFilters().FirstOrDefaultAsync(c => c.TenantId == targetTenantId && !c.IsDeleted);
+            var existingConfig = await _context.TenantConfigurations.IgnoreQueryFilters().OrderByDescending(c => c.ID).FirstOrDefaultAsync(c => c.TenantId == targetTenantId && !c.IsDeleted);
             if (existingConfig == null)
             {
                 existingConfig = new TenantConfiguration
@@ -515,7 +515,7 @@ public class SettingsController : ControllerBase
         // Update tenant configuration primary color if specified
         if (!string.IsNullOrWhiteSpace(req.PrimaryColor))
         {
-            var config = await _context.TenantConfigurations.FirstOrDefaultAsync(c => c.TenantId == id && !c.IsDeleted);
+            var config = await _context.TenantConfigurations.IgnoreQueryFilters().OrderByDescending(c => c.ID).FirstOrDefaultAsync(c => c.TenantId == id && !c.IsDeleted);
             var loadedConfig = await GetOrLoadTenantConfigAsync(id);
             loadedConfig.PrimaryColorHex = req.PrimaryColor.Trim();
             loadedConfig.PrimaryColor = req.PrimaryColor.Trim();
@@ -549,7 +549,14 @@ public class SettingsController : ControllerBase
                 buttonBgColorHex = loadedConfig.ButtonBgColorHex,
                 buttonBgColor = loadedConfig.ButtonBgColorHex,
                 buttonTextColorHex = loadedConfig.ButtonTextColorHex,
-                buttonTextColor = loadedConfig.ButtonTextColorHex
+                buttonTextColor = loadedConfig.ButtonTextColorHex,
+                supportPhone = loadedConfig.SupportPhone,
+                supportEmail = loadedConfig.SupportEmail,
+                supportWhatsapp = loadedConfig.SupportWhatsapp,
+                supportHours = loadedConfig.SupportHours,
+                whatsappGatewayUrl = loadedConfig.WhatsappGatewayUrl,
+                whatsappInstanceId = loadedConfig.WhatsappInstanceId,
+                whatsappApiKey = loadedConfig.WhatsappApiKey
             };
 
             var brandingJsonStr = JsonSerializer.Serialize(brandingObj, JsonOpts);
@@ -632,6 +639,13 @@ public class SettingsController : ControllerBase
                 if (string.IsNullOrWhiteSpace(loadedBranding.AmountColor)) loadedBranding.AmountColor = loadedBranding.AmountColorHex;
                 if (string.IsNullOrWhiteSpace(loadedBranding.ButtonBgColor)) loadedBranding.ButtonBgColor = loadedBranding.ButtonBgColorHex;
                 if (string.IsNullOrWhiteSpace(loadedBranding.ButtonTextColor)) loadedBranding.ButtonTextColor = loadedBranding.ButtonTextColorHex;
+
+                if (string.IsNullOrWhiteSpace(loadedBranding.WhatsappGatewayUrl)) loadedBranding.WhatsappGatewayUrl = "https://api.green-api.com/waInstance{idInstance}/sendMessage/{apiTokenInstance}";
+                if (string.IsNullOrWhiteSpace(loadedBranding.WhatsappInstanceId)) loadedBranding.WhatsappInstanceId = "710722753006";
+                if (string.IsNullOrWhiteSpace(loadedBranding.WhatsappApiKey)) loadedBranding.WhatsappApiKey = "40384666e75948e28b0c4cb889b316af924f0738a9614f6e8c";
+
+                dbConfig.BrandingJson = JsonSerializer.Serialize(loadedBranding, JsonOpts);
+                await _context.SaveChangesAsync();
 
                 if (!string.IsNullOrWhiteSpace(dbConfig.MenuJson))
                 {
