@@ -73,17 +73,15 @@ public class StockService : IStockService
             var tenant = await _context.Tenants.IgnoreQueryFilters().FirstOrDefaultAsync(t => t.TenantCode.ToLower() == request.TenantCode.ToLower() && !t.IsDeleted);
             if (tenant != null) targetTenantId = tenant.ID;
         }
-        if (targetTenantId <= 0) targetTenantId = 1;
 
         var product = await _context.Products.IgnoreQueryFilters().FirstOrDefaultAsync(p => !p.IsDeleted &&
             ((request.ID > 0 && p.ID == request.ID) ||
              (request.ItemId.HasValue && request.ItemId > 0 && p.ItemId == request.ItemId.Value) ||
-             (!string.IsNullOrWhiteSpace(request.Name) && p.Name.ToLower() == request.Name.ToLower() && p.TenantId == targetTenantId)));
+             (!string.IsNullOrWhiteSpace(request.Name) && p.Name.ToLower() == request.Name.ToLower() && (targetTenantId <= 0 || p.TenantId == targetTenantId))));
 
         if (product == null)
         {
-            // Item exists in V_Items catalog but doesn't have a V_Stock row yet; create new stock entry
-            return await CreateAsync(request);
+            return PostResponse.Error("Stock item not found.", 404);
         }
 
         if (!string.IsNullOrWhiteSpace(request.Name)) product.Name = request.Name;
@@ -140,7 +138,6 @@ public class StockService : IStockService
             if (tenant != null) targetTenantId = tenant.ID;
         }
 
-        // Explicit LINQ Join between V_Stock and V_Items
         var stockQuery = _context.Stock.IgnoreQueryFilters().AsNoTracking().Where(p => !p.IsDeleted);
         var itemsQuery = _context.Items.IgnoreQueryFilters().AsNoTracking().Where(i => !i.IsDeleted);
 
@@ -150,7 +147,7 @@ public class StockService : IStockService
             itemsQuery = itemsQuery.Where(i => i.TenantId == targetTenantId);
         }
 
-        // Perform Left Join of Stock with Items on ItemId == Item.ID or ProductCode == ItemCode
+        // Left Join of Stock with Items
         var joinedQuery = from s in stockQuery
                           join i in itemsQuery on s.ItemId equals i.ID into itemGroup
                           from i in itemGroup.DefaultIfEmpty()
@@ -205,52 +202,6 @@ public class StockService : IStockService
             .Skip((pageNumber - 1) * pageSize)
             .Take(pageSize)
             .ToListAsync();
-
-        // Include catalog items from V_Items that don't have stock entries yet
-        try
-        {
-            var existingNames = stockList.Select(s => (s.Name ?? "").ToLower()).ToHashSet();
-            var existingItemIds = stockList.Select(s => s.ItemId ?? 0).Where(id => id > 0).ToHashSet();
-            var existingCodes = stockList.Select(s => (s.ProductCode ?? "").ToLower()).ToHashSet();
-
-            if (!string.IsNullOrWhiteSpace(request.Search))
-            {
-                var sLower = request.Search.ToLower();
-                itemsQuery = itemsQuery.Where(i => (i.Name != null && i.Name.ToLower().Contains(sLower)) ||
-                                                   (i.ItemCode != null && i.ItemCode.ToLower().Contains(sLower)) ||
-                                                   (i.Category != null && i.Category.ToLower().Contains(sLower)));
-            }
-
-            var unlinkedItems = await itemsQuery.ToListAsync();
-            foreach (var item in unlinkedItems)
-            {
-                var nameLower = (item.Name ?? "").ToLower();
-                var codeLower = (item.ItemCode ?? "").ToLower();
-                if (!existingItemIds.Contains(item.ID) && !existingNames.Contains(nameLower) && !existingCodes.Contains(codeLower))
-                {
-                    stockList.Add(new Stock
-                    {
-                        ID = item.ID,
-                        TenantId = item.TenantId,
-                        ItemId = item.ID,
-                        ProductCode = item.ItemCode ?? $"ITM-{item.ID}",
-                        Name = item.Name ?? "Item",
-                        Category = item.Category,
-                        Unit = string.IsNullOrWhiteSpace(item.Unit) ? "pcs" : item.Unit,
-                        Barcode = item.ItemCode,
-                        PurchasePrice = 0,
-                        SellingPrice = 0,
-                        MRP = 0,
-                        GSTPercent = 0,
-                        OpeningStock = 0,
-                        MinimumStock = 0,
-                        CurrentStock = 0,
-                        ImageUrl = ""
-                    });
-                }
-            }
-        }
-        catch (Exception) {}
 
         foreach (var stock in stockList)
         {
