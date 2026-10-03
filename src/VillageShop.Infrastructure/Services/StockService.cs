@@ -149,10 +149,63 @@ public class StockService : IStockService
             query = query.Where(p => p.Category == request.Category);
         }
 
-        return await query
+        var stockList = await query
             .OrderByDescending(p => p.ID)
             .Skip((pageNumber - 1) * pageSize)
             .Take(pageSize)
             .ToListAsync();
+
+        // Also fetch items from V_Items (V_Items catalog) for targetTenantId that are not in V_Stock yet
+        try
+        {
+            var existingNames = stockList.Select(s => s.Name.ToLower()).ToHashSet();
+            var existingItemIds = stockList.Select(s => s.ItemId ?? 0).Where(id => id > 0).ToHashSet();
+            var existingCodes = stockList.Select(s => s.ProductCode.ToLower()).ToHashSet();
+
+            var itemsQuery = _context.Items.IgnoreQueryFilters().AsNoTracking().Where(i => !i.IsDeleted);
+            if (targetTenantId > 0)
+            {
+                itemsQuery = itemsQuery.Where(i => i.TenantId == targetTenantId);
+            }
+            if (!string.IsNullOrWhiteSpace(request.Search))
+            {
+                var sLower = request.Search.ToLower();
+                itemsQuery = itemsQuery.Where(i => (i.Name != null && i.Name.ToLower().Contains(sLower)) ||
+                                                   (i.ItemCode != null && i.ItemCode.ToLower().Contains(sLower)) ||
+                                                   (i.Category != null && i.Category.ToLower().Contains(sLower)));
+            }
+
+            var itemsList = await itemsQuery.ToListAsync();
+            foreach (var item in itemsList)
+            {
+                var nameLower = (item.Name ?? "").ToLower();
+                var codeLower = (item.ItemCode ?? "").ToLower();
+                if (!existingItemIds.Contains(item.ID) && !existingNames.Contains(nameLower) && !existingCodes.Contains(codeLower))
+                {
+                    stockList.Add(new Stock
+                    {
+                        ID = item.ID,
+                        TenantId = item.TenantId,
+                        ItemId = item.ID,
+                        ProductCode = item.ItemCode ?? $"ITM-{item.ID}",
+                        Name = item.Name ?? "Item",
+                        Category = item.Category,
+                        Unit = string.IsNullOrWhiteSpace(item.Unit) ? "pcs" : item.Unit,
+                        Barcode = item.ItemCode,
+                        PurchasePrice = 0,
+                        SellingPrice = 0,
+                        MRP = 0,
+                        GSTPercent = 0,
+                        OpeningStock = 0,
+                        MinimumStock = 0,
+                        CurrentStock = 0,
+                        ImageUrl = ""
+                    });
+                }
+            }
+        }
+        catch (Exception) {}
+
+        return stockList;
     }
 }

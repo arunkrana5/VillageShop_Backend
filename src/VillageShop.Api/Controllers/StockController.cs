@@ -72,6 +72,11 @@ public class StockController : ControllerBase
             request.TenantId = headerTid;
         }
 
+        if ((!request.TenantId.HasValue || request.TenantId <= 0) && Request.Headers.TryGetValue("X-Tenant-Code", out var headerTCode) && !string.IsNullOrWhiteSpace(headerTCode))
+        {
+            request.TenantCode = headerTCode;
+        }
+
         var products = await _stockService.SearchAsync(request);
         return Ok(products);
     }
