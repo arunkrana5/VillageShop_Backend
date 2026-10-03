@@ -109,9 +109,20 @@ public class ItemService : IItemService
 
     public async Task<IEnumerable<Item>> SearchAsync(ItemSearchRequest request)
     {
-        var query = _context.Items.Where(i => !i.IsDeleted);
+        var query = _context.Items.IgnoreQueryFilters().AsNoTracking().Where(i => !i.IsDeleted);
 
-        long effectiveTenantId = request.TenantId ?? _currentTenantService.TenantId;
+        long effectiveTenantId = request.TenantId ?? 0;
+        if (effectiveTenantId <= 0 && !string.IsNullOrWhiteSpace(request.TenantCode))
+        {
+            var tenant = await _context.Tenants.IgnoreQueryFilters().FirstOrDefaultAsync(t => t.TenantCode.ToLower() == request.TenantCode.ToLower() && !t.IsDeleted);
+            if (tenant != null) effectiveTenantId = tenant.ID;
+        }
+
+        if (effectiveTenantId <= 0 && _currentTenantService != null && _currentTenantService.TenantId > 0)
+        {
+            effectiveTenantId = _currentTenantService.TenantId;
+        }
+
         if (effectiveTenantId > 0)
         {
             query = query.Where(i => i.TenantId == effectiveTenantId);
@@ -120,8 +131,8 @@ public class ItemService : IItemService
         if (!string.IsNullOrWhiteSpace(request.SearchTerm))
         {
             var term = request.SearchTerm.ToLower().Trim();
-            query = query.Where(i => i.Name.ToLower().Contains(term) ||
-                                     i.ItemCode.ToLower().Contains(term) ||
+            query = query.Where(i => (i.Name != null && i.Name.ToLower().Contains(term)) ||
+                                     (i.ItemCode != null && i.ItemCode.ToLower().Contains(term)) ||
                                      (i.Category != null && i.Category.ToLower().Contains(term)));
         }
 
