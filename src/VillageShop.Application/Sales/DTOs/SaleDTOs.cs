@@ -8,7 +8,7 @@ public class CreateSaleItemRequest
     public long ProductId
     {
         get => _productId;
-        set => _productId = value;
+        set => _productId = value > 0 ? value : _productId;
     }
     public long Id
     {
@@ -20,19 +20,19 @@ public class CreateSaleItemRequest
     public string? ProductName
     {
         get => _productName;
-        set => _productName = value;
+        set => _productName = !string.IsNullOrWhiteSpace(value) ? value : _productName;
     }
     public string? Name
     {
         get => _productName;
-        set => _productName = string.IsNullOrWhiteSpace(_productName) ? value : _productName;
+        set => _productName = !string.IsNullOrWhiteSpace(value) ? value : _productName;
     }
 
     private decimal _quantity;
     public decimal Quantity
     {
         get => _quantity;
-        set => _quantity = value;
+        set => _quantity = value > 0 ? value : _quantity;
     }
     public decimal Qty
     {
@@ -44,7 +44,7 @@ public class CreateSaleItemRequest
     public decimal UnitPrice
     {
         get => _unitPrice;
-        set => _unitPrice = value;
+        set => _unitPrice = value > 0 ? value : _unitPrice;
     }
     public decimal Price
     {

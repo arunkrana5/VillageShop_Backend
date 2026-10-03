@@ -163,13 +163,128 @@ public class CustomersController : ControllerBase
         return Ok(PostResponse.Success($"Customer '{customer.Name}' updated successfully.", customer.ID));
     }
 
+    [HttpGet("{identifier}/ledger")]
+    public async Task<IActionResult> GetCustomerLedger(string identifier)
+    {
+        Customer? customer = null;
+        if (long.TryParse(identifier, out long id))
+        {
+            customer = await _context.Customers.IgnoreQueryFilters().FirstOrDefaultAsync(c => c.ID == id && !c.IsDeleted);
+        }
+        if (customer == null)
+        {
+            customer = await _context.Customers.IgnoreQueryFilters().FirstOrDefaultAsync(c => c.Name.ToLower() == identifier.ToLower() && !c.IsDeleted);
+        }
+        if (customer == null)
+        {
+            customer = await _context.Customers.IgnoreQueryFilters().FirstOrDefaultAsync(c => c.Mobile == identifier && !c.IsDeleted);
+        }
+
+        if (customer == null)
+        {
+            return NotFound(PostResponse.Error("Customer not found.", 404));
+        }
+
+        var ledgers = await _context.UdhaarLedgers
+            .IgnoreQueryFilters()
+            .AsNoTracking()
+            .Where(l => l.CustomerId == customer.ID && !l.IsDeleted)
+            .OrderBy(l => l.TransactionDate)
+            .ToListAsync();
+
+        var resultList = new List<object>();
+
+        if (ledgers.Any())
+        {
+            foreach (var l in ledgers)
+            {
+                resultList.Add(new
+                {
+                    id = l.ID.ToString(),
+                    date = l.TransactionDate.ToString("dd MMM yyyy, hh:mm tt"),
+                    rawDate = l.TransactionDate,
+                    type = l.TransactionType,
+                    description = l.Description ?? (l.DebitAmount > 0 ? "Debit Sale" : "Payment Credit"),
+                    debit = (double)l.DebitAmount,
+                    credit = (double)l.CreditAmount,
+                    balance = (double)l.RunningBalance
+                });
+            }
+        }
+        else
+        {
+            // Fallback: search sales if no ledger records exist yet
+            var sales = await _context.Sales
+                .IgnoreQueryFilters()
+                .AsNoTracking()
+                .Where(s => s.CustomerId == customer.ID && !s.IsDeleted)
+                .OrderBy(s => s.SaleDate)
+                .ToListAsync();
+
+            decimal running = 0;
+            foreach (var s in sales)
+            {
+                if (s.UdhaarAmount > 0)
+                {
+                    running += s.UdhaarAmount;
+                    resultList.Add(new
+                    {
+                        id = $"sale-{s.ID}",
+                        date = s.SaleDate.ToString("dd MMM yyyy, hh:mm tt"),
+                        rawDate = s.SaleDate,
+                        type = "CREDIT_SALE",
+                        description = $"Invoice #{s.InvoiceNumber}",
+                        debit = (double)s.UdhaarAmount,
+                        credit = 0.0,
+                        balance = (double)running
+                    });
+                }
+            }
+        }
+
+        return Ok(new
+        {
+            customer = new
+            {
+                id = customer.ID.ToString(),
+                name = customer.Name,
+                phone = customer.Mobile ?? "",
+                currentBalance = (double)customer.CurrentBalance
+            },
+            transactions = resultList
+        });
+    }
+
     [HttpPost("payment")]
     public async Task<IActionResult> RecordPayment([FromBody] CustomerPaymentRequest request)
     {
-        var customer = await _context.Customers.IgnoreQueryFilters().FirstOrDefaultAsync(c => c.Name.ToLower() == request.CustomerName.ToLower() && !c.IsDeleted);
+        Customer? customer = null;
+        if (request.CustomerId.HasValue && request.CustomerId.Value > 0)
+        {
+            customer = await _context.Customers.IgnoreQueryFilters().FirstOrDefaultAsync(c => c.ID == request.CustomerId.Value && !c.IsDeleted);
+        }
+        if (customer == null && !string.IsNullOrWhiteSpace(request.CustomerName))
+        {
+            customer = await _context.Customers.IgnoreQueryFilters().FirstOrDefaultAsync(c => c.Name.ToLower() == request.CustomerName.ToLower() && !c.IsDeleted);
+        }
+
         if (customer != null)
         {
             customer.CurrentBalance = (decimal)request.RemainingUdhaar;
+
+            var ledgerEntry = new UdhaarLedger
+            {
+                TenantId = customer.TenantId,
+                CustomerId = customer.ID,
+                TransactionDate = DateTime.UtcNow,
+                TransactionType = "PAYMENT",
+                DebitAmount = 0,
+                CreditAmount = (decimal)request.AmountPaid,
+                RunningBalance = customer.CurrentBalance,
+                Description = string.IsNullOrWhiteSpace(request.Note) ? $"Payment Received (₹ {request.AmountPaid:F2})" : request.Note
+            };
+            _context.UdhaarLedgers.Add(ledgerEntry);
+
             await _context.SaveChangesAsync();
         }
 
@@ -221,7 +336,9 @@ public class CustomerCreateRequest
 
 public class CustomerPaymentRequest
 {
+    public long? CustomerId { get; set; }
     public string CustomerName { get; set; } = string.Empty;
     public double AmountPaid { get; set; }
     public double RemainingUdhaar { get; set; }
+    public string? Note { get; set; }
 }
