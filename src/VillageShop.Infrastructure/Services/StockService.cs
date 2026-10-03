@@ -56,7 +56,7 @@ public class StockService : IStockService
             RackNumber = request.RackNumber,
             ExpiryDate = request.ExpiryDate,
             HSNCode = request.HSNCode,
-            ImageUrl = request.ImageUrl
+            ImageUrl = (request.ImageUrl != null && request.ImageUrl.Length > 500000) ? "" : request.ImageUrl
         };
 
         _context.Stock.Add(product);
@@ -89,7 +89,7 @@ public class StockService : IStockService
         if (!string.IsNullOrWhiteSpace(request.RackNumber)) product.RackNumber = request.RackNumber;
         if (request.ExpiryDate.HasValue) product.ExpiryDate = request.ExpiryDate;
         if (!string.IsNullOrWhiteSpace(request.HSNCode)) product.HSNCode = request.HSNCode;
-        if (!string.IsNullOrWhiteSpace(request.ImageUrl)) product.ImageUrl = request.ImageUrl;
+        if (!string.IsNullOrWhiteSpace(request.ImageUrl)) product.ImageUrl = request.ImageUrl.Length > 500000 ? "" : request.ImageUrl;
 
         await _context.SaveChangesAsync();
         return PostResponse.Success($"Stock item '{product.Name}' updated successfully.", product.ID);
@@ -205,6 +205,14 @@ public class StockService : IStockService
             }
         }
         catch (Exception) {}
+
+        foreach (var stock in stockList)
+        {
+            if (stock.ImageUrl != null && stock.ImageUrl.Length > 500000)
+            {
+                stock.ImageUrl = "";
+            }
+        }
 
         return stockList;
     }
