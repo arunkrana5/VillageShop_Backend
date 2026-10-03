@@ -50,7 +50,7 @@ public class CustomersController : ControllerBase
 
         if (targetTenantId > 0)
         {
-            query = query.Where(c => c.TenantId == targetTenantId || c.TenantId == 1);
+            query = query.Where(c => c.TenantId == targetTenantId);
         }
 
         var customers = await query

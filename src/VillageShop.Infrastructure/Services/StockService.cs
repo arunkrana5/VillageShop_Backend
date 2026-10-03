@@ -131,7 +131,7 @@ public class StockService : IStockService
 
         if (targetTenantId > 0)
         {
-            query = query.Where(p => p.TenantId == targetTenantId || p.TenantId == 1);
+            query = query.Where(p => p.TenantId == targetTenantId);
         }
 
         if (!string.IsNullOrWhiteSpace(request.Search))
