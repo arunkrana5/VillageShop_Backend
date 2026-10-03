@@ -67,10 +67,23 @@ public class StockService : IStockService
 
     public async Task<PostResponse> UpdateAsync(UpdateStockInRequest request)
     {
-        var product = await _context.Products.IgnoreQueryFilters().FirstOrDefaultAsync(p => (request.ID > 0 && p.ID == request.ID) || (!string.IsNullOrWhiteSpace(request.Name) && p.Name.ToLower() == request.Name.ToLower()) && !p.IsDeleted);
+        long targetTenantId = request.TenantId ?? 0;
+        if (targetTenantId <= 0 && !string.IsNullOrWhiteSpace(request.TenantCode))
+        {
+            var tenant = await _context.Tenants.IgnoreQueryFilters().FirstOrDefaultAsync(t => t.TenantCode.ToLower() == request.TenantCode.ToLower() && !t.IsDeleted);
+            if (tenant != null) targetTenantId = tenant.ID;
+        }
+        if (targetTenantId <= 0) targetTenantId = 1;
+
+        var product = await _context.Products.IgnoreQueryFilters().FirstOrDefaultAsync(p => !p.IsDeleted &&
+            ((request.ID > 0 && p.ID == request.ID) ||
+             (request.ItemId.HasValue && request.ItemId > 0 && p.ItemId == request.ItemId.Value) ||
+             (!string.IsNullOrWhiteSpace(request.Name) && p.Name.ToLower() == request.Name.ToLower() && p.TenantId == targetTenantId)));
+
         if (product == null)
         {
-            return PostResponse.Error("Stock item not found.", 404);
+            // Item exists in V_Items catalog but doesn't have a V_Stock row yet; create new stock entry
+            return await CreateAsync(request);
         }
 
         if (!string.IsNullOrWhiteSpace(request.Name)) product.Name = request.Name;
