@@ -140,46 +140,79 @@ public class StockService : IStockService
             if (tenant != null) targetTenantId = tenant.ID;
         }
 
-        var query = _context.Stock.IgnoreQueryFilters().AsNoTracking().Where(p => !p.IsDeleted);
+        // Explicit LINQ Join between V_Stock and V_Items
+        var stockQuery = _context.Stock.IgnoreQueryFilters().AsNoTracking().Where(p => !p.IsDeleted);
+        var itemsQuery = _context.Items.IgnoreQueryFilters().AsNoTracking().Where(i => !i.IsDeleted);
 
         if (targetTenantId > 0)
         {
-            query = query.Where(p => p.TenantId == targetTenantId);
+            stockQuery = stockQuery.Where(p => p.TenantId == targetTenantId);
+            itemsQuery = itemsQuery.Where(i => i.TenantId == targetTenantId);
         }
+
+        // Perform Left Join of Stock with Items on ItemId == Item.ID or ProductCode == ItemCode
+        var joinedQuery = from s in stockQuery
+                          join i in itemsQuery on s.ItemId equals i.ID into itemGroup
+                          from i in itemGroup.DefaultIfEmpty()
+                          select new Stock
+                          {
+                              ID = s.ID,
+                              TenantId = s.TenantId,
+                              ItemId = s.ItemId ?? (i != null ? (long?)i.ID : null),
+                              ProductCode = s.ProductCode,
+                              Name = i != null && !string.IsNullOrWhiteSpace(i.Name) ? i.Name : s.Name,
+                              Category = i != null && !string.IsNullOrWhiteSpace(i.Category) ? i.Category : s.Category,
+                              Brand = s.Brand,
+                              Unit = i != null && !string.IsNullOrWhiteSpace(i.Unit) ? i.Unit : s.Unit,
+                              Barcode = s.Barcode,
+                              PurchasePrice = s.PurchasePrice,
+                              SellingPrice = s.SellingPrice,
+                              MRP = s.MRP,
+                              GSTPercent = s.GSTPercent,
+                              OpeningStock = s.OpeningStock,
+                              MinimumStock = s.MinimumStock,
+                              CurrentStock = s.CurrentStock,
+                              BatchNumber = s.BatchNumber,
+                              RackNumber = s.RackNumber,
+                              ExpiryDate = s.ExpiryDate,
+                              HSNCode = s.HSNCode,
+                              ImageUrl = s.ImageUrl,
+                              IsActive = s.IsActive,
+                              Priority = s.Priority,
+                              CreatedBy = s.CreatedBy,
+                              CreatedDate = s.CreatedDate,
+                              ModifiedBy = s.ModifiedBy,
+                              ModifiedDate = s.ModifiedDate
+                          };
 
         if (!string.IsNullOrWhiteSpace(request.Search))
         {
             var searchLower = request.Search.ToLower();
-            query = query.Where(p => (p.Name != null && p.Name.ToLower().Contains(searchLower)) ||
-                                     (p.Barcode != null && p.Barcode.ToLower().Contains(searchLower)) ||
-                                     (p.BatchNumber != null && p.BatchNumber.ToLower().Contains(searchLower)) ||
-                                     (p.RackNumber != null && p.RackNumber.ToLower().Contains(searchLower)) ||
-                                     (p.ProductCode != null && p.ProductCode.ToLower().Contains(searchLower)));
+            joinedQuery = joinedQuery.Where(p => (p.Name != null && p.Name.ToLower().Contains(searchLower)) ||
+                                                 (p.Barcode != null && p.Barcode.ToLower().Contains(searchLower)) ||
+                                                 (p.BatchNumber != null && p.BatchNumber.ToLower().Contains(searchLower)) ||
+                                                 (p.RackNumber != null && p.RackNumber.ToLower().Contains(searchLower)) ||
+                                                 (p.ProductCode != null && p.ProductCode.ToLower().Contains(searchLower)));
         }
 
         if (!string.IsNullOrWhiteSpace(request.Category))
         {
-            query = query.Where(p => p.Category == request.Category);
+            joinedQuery = joinedQuery.Where(p => p.Category == request.Category);
         }
 
-        var stockList = await query
+        var stockList = await joinedQuery
             .OrderByDescending(p => p.ID)
             .Skip((pageNumber - 1) * pageSize)
             .Take(pageSize)
             .ToListAsync();
 
-        // Also fetch items from V_Items (V_Items catalog) for targetTenantId that are not in V_Stock yet
+        // Include catalog items from V_Items that don't have stock entries yet
         try
         {
-            var existingNames = stockList.Select(s => s.Name.ToLower()).ToHashSet();
+            var existingNames = stockList.Select(s => (s.Name ?? "").ToLower()).ToHashSet();
             var existingItemIds = stockList.Select(s => s.ItemId ?? 0).Where(id => id > 0).ToHashSet();
-            var existingCodes = stockList.Select(s => s.ProductCode.ToLower()).ToHashSet();
+            var existingCodes = stockList.Select(s => (s.ProductCode ?? "").ToLower()).ToHashSet();
 
-            var itemsQuery = _context.Items.IgnoreQueryFilters().AsNoTracking().Where(i => !i.IsDeleted);
-            if (targetTenantId > 0)
-            {
-                itemsQuery = itemsQuery.Where(i => i.TenantId == targetTenantId);
-            }
             if (!string.IsNullOrWhiteSpace(request.Search))
             {
                 var sLower = request.Search.ToLower();
@@ -188,8 +221,8 @@ public class StockService : IStockService
                                                    (i.Category != null && i.Category.ToLower().Contains(sLower)));
             }
 
-            var itemsList = await itemsQuery.ToListAsync();
-            foreach (var item in itemsList)
+            var unlinkedItems = await itemsQuery.ToListAsync();
+            foreach (var item in unlinkedItems)
             {
                 var nameLower = (item.Name ?? "").ToLower();
                 var codeLower = (item.ItemCode ?? "").ToLower();
