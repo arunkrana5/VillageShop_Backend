@@ -438,7 +438,12 @@ BEGIN
     (1, 'Brand', 'Amul', 'AMUL', 'Amul India', 2),
     (1, 'Brand', 'Tata Consumer', 'TATA', 'Tata Products', 3),
     (1, 'Brand', 'Nestle', 'NESTLE', 'Nestle India', 4);
-END";
+END
+
+-- Clean up any empty or unnamed master records automatically
+UPDATE [V_Masters]
+SET [MasterName] = 'Master Item #' + CAST([ID] AS nvarchar(20))
+WHERE [MasterName] IS NULL OR LTRIM(RTRIM([MasterName])) = '';";
             db.Database.ExecuteSqlRaw(createMastersSql);
 
             var ensureCommonColumnsSql = @"

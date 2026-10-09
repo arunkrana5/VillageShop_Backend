@@ -90,6 +90,18 @@ public class MastersController : ControllerBase
     [HttpPost]
     public async Task<IActionResult> CreateMaster([FromBody] GenericMasterRequest req)
     {
+        if (req != null && string.IsNullOrWhiteSpace(req.MasterName))
+        {
+            string? fallbackName = req.CategoryName ?? req.UomName ?? req.ItemTypeName ?? req.BrandName;
+            if (!string.IsNullOrWhiteSpace(fallbackName)) req.MasterName = fallbackName;
+        }
+
+        if (req != null && string.IsNullOrWhiteSpace(req.MasterCode))
+        {
+            string? fallbackCode = req.CategoryCode ?? req.UomCode ?? req.ItemTypeCode ?? req.BrandCode;
+            if (!string.IsNullOrWhiteSpace(fallbackCode)) req.MasterCode = fallbackCode;
+        }
+
         if (req == null || string.IsNullOrWhiteSpace(req.MasterName))
             return BadRequest(PostResponse.Error("Master Name is required."));
 
@@ -127,11 +139,23 @@ public class MastersController : ControllerBase
         var entity = await _context.Masters.IgnoreQueryFilters().FirstOrDefaultAsync(m => m.ID == id && !m.IsDeleted);
         if (entity == null) return NotFound(PostResponse.Error("Master record not found.", 404));
 
-        if (!string.IsNullOrWhiteSpace(req.MasterType)) entity.MasterType = req.MasterType.Trim();
-        if (!string.IsNullOrWhiteSpace(req.MasterName)) entity.MasterName = req.MasterName.Trim();
-        if (req.MasterCode != null) entity.MasterCode = req.MasterCode.Trim();
-        if (req.Description != null) entity.Description = req.Description;
-        if (req.Priority.HasValue) entity.Priority = req.Priority.Value;
+        if (req != null && string.IsNullOrWhiteSpace(req.MasterName))
+        {
+            string? fallbackName = req.CategoryName ?? req.UomName ?? req.ItemTypeName ?? req.BrandName;
+            if (!string.IsNullOrWhiteSpace(fallbackName)) req.MasterName = fallbackName;
+        }
+
+        if (req != null && string.IsNullOrWhiteSpace(req.MasterCode))
+        {
+            string? fallbackCode = req.CategoryCode ?? req.UomCode ?? req.ItemTypeCode ?? req.BrandCode;
+            if (!string.IsNullOrWhiteSpace(fallbackCode)) req.MasterCode = fallbackCode;
+        }
+
+        if (!string.IsNullOrWhiteSpace(req?.MasterType)) entity.MasterType = req.MasterType.Trim();
+        if (!string.IsNullOrWhiteSpace(req?.MasterName)) entity.MasterName = req.MasterName.Trim();
+        if (req?.MasterCode != null) entity.MasterCode = req.MasterCode.Trim();
+        if (req?.Description != null) entity.Description = req.Description;
+        if (req?.Priority.HasValue == true) entity.Priority = req.Priority.Value;
 
         await _context.SaveChangesAsync();
         return Ok(PostResponse.Success("Master record updated successfully.", entity.ID));
