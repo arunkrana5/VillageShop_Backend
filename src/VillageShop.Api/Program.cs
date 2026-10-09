@@ -363,37 +363,6 @@ BEGIN
     );
 END
 
-IF EXISTS (SELECT * FROM sys.tables WHERE name = 'V_ItemCategories')
-BEGIN
-    INSERT INTO [V_Masters] ([TenantId], [MasterType], [MasterName], [MasterCode], [Description], [Priority], [IsActive], [IsDeleted], [CreatedDate])
-    SELECT [TenantId], 'ItemCategory', [CategoryName], ISNULL([CategoryCode], ''), [Description], [Priority], [IsActive], [IsDeleted], ISNULL([CreatedDate], GETUTCDATE())
-    FROM [V_ItemCategories]
-    WHERE NOT EXISTS (SELECT 1 FROM [V_Masters] WHERE [MasterType] = 'ItemCategory' AND [MasterName] = [V_ItemCategories].[CategoryName]);
-END
-
-IF EXISTS (SELECT * FROM sys.tables WHERE name = 'V_UnitOfMeasurements')
-BEGIN
-    INSERT INTO [V_Masters] ([TenantId], [MasterType], [MasterName], [MasterCode], [Description], [Priority], [IsActive], [IsDeleted], [CreatedDate])
-    SELECT [TenantId], 'UnitOfMeasurement', [UOMName], ISNULL([UOMCode], ''), [Description], [Priority], [IsActive], [IsDeleted], ISNULL([CreatedDate], GETUTCDATE())
-    FROM [V_UnitOfMeasurements]
-    WHERE NOT EXISTS (SELECT 1 FROM [V_Masters] WHERE [MasterType] = 'UnitOfMeasurement' AND [MasterName] = [V_UnitOfMeasurements].[UOMName]);
-END
-
-IF EXISTS (SELECT * FROM sys.tables WHERE name = 'V_ItemTypes')
-BEGIN
-    INSERT INTO [V_Masters] ([TenantId], [MasterType], [MasterName], [MasterCode], [Description], [Priority], [IsActive], [IsDeleted], [CreatedDate])
-    SELECT [TenantId], 'ItemType', [ItemTypeName], ISNULL([ItemTypeCode], ''), [Description], [Priority], [IsActive], [IsDeleted], ISNULL([CreatedDate], GETUTCDATE())
-    FROM [V_ItemTypes]
-    WHERE NOT EXISTS (SELECT 1 FROM [V_Masters] WHERE [MasterType] = 'ItemType' AND [MasterName] = [V_ItemTypes].[ItemTypeName]);
-END
-
-IF EXISTS (SELECT * FROM sys.tables WHERE name = 'V_Brands')
-BEGIN
-    INSERT INTO [V_Masters] ([TenantId], [MasterType], [MasterName], [MasterCode], [Description], [Priority], [IsActive], [IsDeleted], [CreatedDate])
-    SELECT [TenantId], 'Brand', [BrandName], ISNULL([BrandCode], ''), [Description], [Priority], [IsActive], [IsDeleted], ISNULL([CreatedDate], GETUTCDATE())
-    FROM [V_Brands]
-    WHERE NOT EXISTS (SELECT 1 FROM [V_Masters] WHERE [MasterType] = 'Brand' AND [MasterName] = [V_Brands].[BrandName]);
-END
 
 -- Seed Default Masters if V_Masters is empty
 IF NOT EXISTS (SELECT 1 FROM [V_Masters] WHERE [MasterType] = 'ItemCategory')

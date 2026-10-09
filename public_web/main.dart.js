@@ -100433,13 +100433,13 @@ s=A.aG(A.bG(n,A.bO(n,new A.e7(4,r,B.dH),n,B.ex,n,n,n,n,!0,n,n,n,n,n,n,q,!0,n,n,n
 j=A.a9(n,A.a_(A.a([s,B.hb,new A.Oc(A.m(m?"\u0938\u0915\u094d\u0930\u093f\u092f":"Active Only",n,n,n,n,n,n,n),o.f,new A.azq(o),B.qX,B.d4,n)],i),B.f,B.i,B.e,n),B.j,j,n,n,n,n,n,B.a_,n,n,n)
 j=A.aD(A.a([j,A.aG(o.z?B.hz:new A.DU(o.d,A.a([o.yn(o.r,"ItemCategory",m,l),o.yn(o.w,"UnitOfMeasurement",m,l),o.yn(o.x,"ItemType",m,l),o.yn(o.y,"Brand",m,l)],i),n),1)],i),B.f,B.i,B.e)
 return A.mp(k,n,j,B.dg,A.aPC(B.mM,n,B.h,B.Ty,A.m(m?"\u0928\u092f\u093e \u092e\u093e\u0938\u094d\u091f\u0930 \u091c\u094b\u0921\u093c\u0947\u0902":"Add Master",n,n,n,n,n,n,n),new A.azr(o,a)))},
-Sl(a){var s,r,q,p,o,n=["masterName","MasterName","name","Name","categoryName","CategoryName","uomName","UOMName","itemTypeName","ItemTypeName","brandName","BrandName"]
-for(s=J.W(a),r=0;r<12;++r){q=n[r]
+Sl(a){var s,r,q,p,o,n=["masterName","MasterName","name","Name"]
+for(s=J.W(a),r=0;r<4;++r){q=n[r]
 if(s.h(a,q)!=null&&B.d.bB(J.M(s.h(a,q))).length!==0)return B.d.bB(J.M(s.h(a,q)))}p=s.h(a,"id")
 o=p==null?s.h(a,"ID"):p
 return"Master Record #"+A.h(o==null?"":o)},
-Sk(a){var s,r,q,p=["masterCode","MasterCode","code","Code","categoryCode","CategoryCode","uomCode","UOMCode","symbol","Symbol","itemTypeCode","ItemTypeCode","brandCode","BrandCode"]
-for(s=J.W(a),r=0;r<14;++r){q=p[r]
+Sk(a){var s,r,q,p=["masterCode","MasterCode","code","Code"]
+for(s=J.W(a),r=0;r<4;++r){q=p[r]
 if(s.h(a,q)!=null&&B.d.bB(J.M(s.h(a,q))).length!==0)return B.d.bB(J.M(s.h(a,q)))}return""},
 yn(a,b,c,d){var s,r=null,q=A.X(a).i("ay<1>"),p=A.Z(new A.ay(a,new A.az3(this),q),!0,q.i("p.E"))
 q=p.length

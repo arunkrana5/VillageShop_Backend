@@ -90,18 +90,6 @@ public class MastersController : ControllerBase
     [HttpPost]
     public async Task<IActionResult> CreateMaster([FromBody] GenericMasterRequest req)
     {
-        if (req != null && string.IsNullOrWhiteSpace(req.MasterName))
-        {
-            string? fallbackName = req.CategoryName ?? req.UomName ?? req.ItemTypeName ?? req.BrandName;
-            if (!string.IsNullOrWhiteSpace(fallbackName)) req.MasterName = fallbackName;
-        }
-
-        if (req != null && string.IsNullOrWhiteSpace(req.MasterCode))
-        {
-            string? fallbackCode = req.CategoryCode ?? req.UomCode ?? req.ItemTypeCode ?? req.BrandCode;
-            if (!string.IsNullOrWhiteSpace(fallbackCode)) req.MasterCode = fallbackCode;
-        }
-
         if (req == null || string.IsNullOrWhiteSpace(req.MasterName))
             return BadRequest(PostResponse.Error("Master Name is required."));
 
@@ -138,18 +126,6 @@ public class MastersController : ControllerBase
     {
         var entity = await _context.Masters.IgnoreQueryFilters().FirstOrDefaultAsync(m => m.ID == id && !m.IsDeleted);
         if (entity == null) return NotFound(PostResponse.Error("Master record not found.", 404));
-
-        if (req != null && string.IsNullOrWhiteSpace(req.MasterName))
-        {
-            string? fallbackName = req.CategoryName ?? req.UomName ?? req.ItemTypeName ?? req.BrandName;
-            if (!string.IsNullOrWhiteSpace(fallbackName)) req.MasterName = fallbackName;
-        }
-
-        if (req != null && string.IsNullOrWhiteSpace(req.MasterCode))
-        {
-            string? fallbackCode = req.CategoryCode ?? req.UomCode ?? req.ItemTypeCode ?? req.BrandCode;
-            if (!string.IsNullOrWhiteSpace(fallbackCode)) req.MasterCode = fallbackCode;
-        }
 
         if (!string.IsNullOrWhiteSpace(req?.MasterType)) entity.MasterType = req.MasterType.Trim();
         if (!string.IsNullOrWhiteSpace(req?.MasterName)) entity.MasterName = req.MasterName.Trim();
@@ -196,23 +172,13 @@ public class MastersController : ControllerBase
         var masters = await _context.Masters.IgnoreQueryFilters().AsNoTracking()
             .Where(m => m.TenantId == tId && m.IsActive && !m.IsDeleted)
             .OrderBy(m => m.Priority).ThenBy(m => m.MasterName)
+            .Select(m => new { id = m.ID, masterType = m.MasterType, masterName = m.MasterName, masterCode = m.MasterCode, name = m.MasterName, code = m.MasterCode })
             .ToListAsync();
 
-        var categories = masters.Where(m => m.MasterType.Equals("ItemCategory", StringComparison.OrdinalIgnoreCase))
-            .Select(m => new { id = m.ID, name = m.MasterName, code = m.MasterCode, categoryName = m.MasterName, categoryCode = m.MasterCode })
-            .ToList();
-
-        var uoms = masters.Where(m => m.MasterType.Equals("UnitOfMeasurement", StringComparison.OrdinalIgnoreCase))
-            .Select(m => new { id = m.ID, name = m.MasterName, code = m.MasterCode, symbol = m.MasterCode.ToLower(), uomName = m.MasterName, uomCode = m.MasterCode })
-            .ToList();
-
-        var itemTypes = masters.Where(m => m.MasterType.Equals("ItemType", StringComparison.OrdinalIgnoreCase))
-            .Select(m => new { id = m.ID, name = m.MasterName, code = m.MasterCode, itemTypeName = m.MasterName, itemTypeCode = m.MasterCode })
-            .ToList();
-
-        var brands = masters.Where(m => m.MasterType.Equals("Brand", StringComparison.OrdinalIgnoreCase))
-            .Select(m => new { id = m.ID, name = m.MasterName, code = m.MasterCode, brandName = m.MasterName, brandCode = m.MasterCode })
-            .ToList();
+        var categories = masters.Where(m => m.masterType.Equals("ItemCategory", StringComparison.OrdinalIgnoreCase)).ToList();
+        var uoms = masters.Where(m => m.masterType.Equals("UnitOfMeasurement", StringComparison.OrdinalIgnoreCase)).ToList();
+        var itemTypes = masters.Where(m => m.masterType.Equals("ItemType", StringComparison.OrdinalIgnoreCase)).ToList();
+        var brands = masters.Where(m => m.masterType.Equals("Brand", StringComparison.OrdinalIgnoreCase)).ToList();
 
         return Ok(new
         {
@@ -236,8 +202,6 @@ public class MastersController : ControllerBase
     public Task<IActionResult> CreateCategory([FromBody] GenericMasterRequest req)
     {
         req.MasterType = "ItemCategory";
-        if (string.IsNullOrWhiteSpace(req.MasterName) && !string.IsNullOrWhiteSpace(req.CategoryName)) req.MasterName = req.CategoryName;
-        if (string.IsNullOrWhiteSpace(req.MasterCode) && !string.IsNullOrWhiteSpace(req.CategoryCode)) req.MasterCode = req.CategoryCode;
         return CreateMaster(req);
     }
 
@@ -245,8 +209,6 @@ public class MastersController : ControllerBase
     public Task<IActionResult> UpdateCategory(long id, [FromBody] GenericMasterRequest req)
     {
         req.MasterType = "ItemCategory";
-        if (string.IsNullOrWhiteSpace(req.MasterName) && !string.IsNullOrWhiteSpace(req.CategoryName)) req.MasterName = req.CategoryName;
-        if (string.IsNullOrWhiteSpace(req.MasterCode) && !string.IsNullOrWhiteSpace(req.CategoryCode)) req.MasterCode = req.CategoryCode;
         return UpdateMaster(id, req);
     }
 
@@ -264,8 +226,6 @@ public class MastersController : ControllerBase
     public Task<IActionResult> CreateUOM([FromBody] GenericMasterRequest req)
     {
         req.MasterType = "UnitOfMeasurement";
-        if (string.IsNullOrWhiteSpace(req.MasterName) && !string.IsNullOrWhiteSpace(req.UomName)) req.MasterName = req.UomName;
-        if (string.IsNullOrWhiteSpace(req.MasterCode) && !string.IsNullOrWhiteSpace(req.UomCode)) req.MasterCode = req.UomCode;
         return CreateMaster(req);
     }
 
@@ -273,8 +233,6 @@ public class MastersController : ControllerBase
     public Task<IActionResult> UpdateUOM(long id, [FromBody] GenericMasterRequest req)
     {
         req.MasterType = "UnitOfMeasurement";
-        if (string.IsNullOrWhiteSpace(req.MasterName) && !string.IsNullOrWhiteSpace(req.UomName)) req.MasterName = req.UomName;
-        if (string.IsNullOrWhiteSpace(req.MasterCode) && !string.IsNullOrWhiteSpace(req.UomCode)) req.MasterCode = req.UomCode;
         return UpdateMaster(id, req);
     }
 
@@ -292,8 +250,6 @@ public class MastersController : ControllerBase
     public Task<IActionResult> CreateItemType([FromBody] GenericMasterRequest req)
     {
         req.MasterType = "ItemType";
-        if (string.IsNullOrWhiteSpace(req.MasterName) && !string.IsNullOrWhiteSpace(req.ItemTypeName)) req.MasterName = req.ItemTypeName;
-        if (string.IsNullOrWhiteSpace(req.MasterCode) && !string.IsNullOrWhiteSpace(req.ItemTypeCode)) req.MasterCode = req.ItemTypeCode;
         return CreateMaster(req);
     }
 
@@ -301,8 +257,6 @@ public class MastersController : ControllerBase
     public Task<IActionResult> UpdateItemType(long id, [FromBody] GenericMasterRequest req)
     {
         req.MasterType = "ItemType";
-        if (string.IsNullOrWhiteSpace(req.MasterName) && !string.IsNullOrWhiteSpace(req.ItemTypeName)) req.MasterName = req.ItemTypeName;
-        if (string.IsNullOrWhiteSpace(req.MasterCode) && !string.IsNullOrWhiteSpace(req.ItemTypeCode)) req.MasterCode = req.ItemTypeCode;
         return UpdateMaster(id, req);
     }
 
@@ -320,8 +274,6 @@ public class MastersController : ControllerBase
     public Task<IActionResult> CreateBrand([FromBody] GenericMasterRequest req)
     {
         req.MasterType = "Brand";
-        if (string.IsNullOrWhiteSpace(req.MasterName) && !string.IsNullOrWhiteSpace(req.BrandName)) req.MasterName = req.BrandName;
-        if (string.IsNullOrWhiteSpace(req.MasterCode) && !string.IsNullOrWhiteSpace(req.BrandCode)) req.MasterCode = req.BrandCode;
         return CreateMaster(req);
     }
 
@@ -329,8 +281,6 @@ public class MastersController : ControllerBase
     public Task<IActionResult> UpdateBrand(long id, [FromBody] GenericMasterRequest req)
     {
         req.MasterType = "Brand";
-        if (string.IsNullOrWhiteSpace(req.MasterName) && !string.IsNullOrWhiteSpace(req.BrandName)) req.MasterName = req.BrandName;
-        if (string.IsNullOrWhiteSpace(req.MasterCode) && !string.IsNullOrWhiteSpace(req.BrandCode)) req.MasterCode = req.BrandCode;
         return UpdateMaster(id, req);
     }
 
@@ -350,14 +300,4 @@ public class GenericMasterRequest
     public string? MasterCode { get; set; }
     public string? Description { get; set; }
     public int? Priority { get; set; }
-
-    // Legacy JSON payload alias mappings
-    public string? CategoryName { get; set; }
-    public string? CategoryCode { get; set; }
-    public string? UomName { get; set; }
-    public string? UomCode { get; set; }
-    public string? ItemTypeName { get; set; }
-    public string? ItemTypeCode { get; set; }
-    public string? BrandName { get; set; }
-    public string? BrandCode { get; set; }
 }
