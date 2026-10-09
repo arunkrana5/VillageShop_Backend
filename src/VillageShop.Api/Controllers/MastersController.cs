@@ -69,7 +69,46 @@ public class MastersController : ControllerBase
             query = query.Where(m => m.MasterName.ToLower().Contains(s) || (m.MasterCode != null && m.MasterCode.ToLower().Contains(s)) || (m.Description != null && m.Description.ToLower().Contains(s)));
         }
 
-        var list = await query.OrderBy(m => m.MasterType).ThenBy(m => m.Priority).ThenBy(m => m.MasterName).ToListAsync();
+        var list = await query.OrderBy(m => m.MasterType).ThenBy(m => m.Priority).ThenBy(m => m.MasterName)
+            .Select(m => new
+            {
+                id = m.ID,
+                ID = m.ID,
+                tenantId = m.TenantId,
+                TenantId = m.TenantId,
+                masterType = m.MasterType,
+                MasterType = m.MasterType,
+                masterName = string.IsNullOrWhiteSpace(m.MasterName) ? "Master Item #" + m.ID : m.MasterName,
+                MasterName = string.IsNullOrWhiteSpace(m.MasterName) ? "Master Item #" + m.ID : m.MasterName,
+                name = string.IsNullOrWhiteSpace(m.MasterName) ? "Master Item #" + m.ID : m.MasterName,
+                Name = string.IsNullOrWhiteSpace(m.MasterName) ? "Master Item #" + m.ID : m.MasterName,
+                masterCode = m.MasterCode ?? "",
+                MasterCode = m.MasterCode ?? "",
+                code = m.MasterCode ?? "",
+                Code = m.MasterCode ?? "",
+                description = m.Description ?? "",
+                Description = m.Description ?? "",
+                priority = m.Priority,
+                Priority = m.Priority,
+                isActive = m.IsActive,
+                IsActive = m.IsActive,
+                isDeleted = m.IsDeleted,
+                IsDeleted = m.IsDeleted,
+                createdBy = m.CreatedBy,
+                CreatedBy = m.CreatedBy,
+                createdDate = m.CreatedDate.ToString("o"),
+                CreatedDate = m.CreatedDate.ToString("o"),
+                modifiedBy = m.ModifiedBy,
+                ModifiedBy = m.ModifiedBy,
+                modifiedDate = m.ModifiedDate.ToString("o"),
+                ModifiedDate = m.ModifiedDate.ToString("o"),
+                entrySource = m.EntrySource ?? "API",
+                EntrySource = m.EntrySource ?? "API",
+                ipAddress = m.IPAddress ?? "127.0.0.1",
+                IPAddress = m.IPAddress ?? "127.0.0.1"
+            })
+            .ToListAsync();
+
         return Ok(list);
     }
 
