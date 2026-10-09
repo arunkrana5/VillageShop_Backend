@@ -28,6 +28,10 @@ public interface IApplicationDbContext
     DbSet<SyncQueue> SyncQueues { get; }
     DbSet<PushNotification> PushNotifications { get; }
     DbSet<UserNotification> UserNotifications { get; }
+    DbSet<ItemCategory> ItemCategories { get; }
+    DbSet<UnitOfMeasurement> UnitOfMeasurements { get; }
+    DbSet<ItemType> ItemTypes { get; }
+    DbSet<Brand> Brands { get; }
 
     Task<int> SaveChangesAsync(CancellationToken cancellationToken = default);
 }

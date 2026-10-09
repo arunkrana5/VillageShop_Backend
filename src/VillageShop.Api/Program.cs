@@ -335,6 +335,134 @@ BEGIN
     END
 END";
             db.Database.ExecuteSqlRaw(reconcileUdhaarLedgersSql);
+
+            var createMastersSql = @"
+IF NOT EXISTS (SELECT * FROM sys.tables WHERE name = 'V_ItemCategories')
+BEGIN
+    CREATE TABLE [V_ItemCategories] (
+        [ID] bigint IDENTITY(1,1) NOT NULL,
+        [TenantId] bigint NOT NULL DEFAULT 1,
+        [CategoryName] nvarchar(250) NOT NULL,
+        [CategoryCode] nvarchar(100) NULL,
+        [Description] nvarchar(max) NULL,
+        [IsActive] bit NOT NULL DEFAULT 1,
+        [IsDeleted] bit NOT NULL DEFAULT 0,
+        [Priority] int NOT NULL DEFAULT 0,
+        [CreatedBy] bigint NOT NULL DEFAULT 0,
+        [CreatedDate] datetime2 NOT NULL DEFAULT GETUTCDATE(),
+        [ModifiedBy] bigint NOT NULL DEFAULT 0,
+        [ModifiedDate] datetime2 NOT NULL DEFAULT GETUTCDATE(),
+        [DeletedBy] bigint NOT NULL DEFAULT 0,
+        [DeletedDate] datetime2 NULL,
+        [EntrySource] nvarchar(100) NOT NULL DEFAULT '',
+        [IPAddress] nvarchar(100) NOT NULL DEFAULT '',
+        CONSTRAINT [PK_V_ItemCategories] PRIMARY KEY CLUSTERED ([ID] ASC)
+    );
+
+    INSERT INTO [V_ItemCategories] ([TenantId], [CategoryName], [CategoryCode], [Description], [Priority])
+    VALUES 
+    (1, 'Grocery & Staples', 'CAT-GROCERY', 'Daily essential food items', 1),
+    (1, 'Dairy & Bakery', 'CAT-DAIRY', 'Milk, butter, bread', 2),
+    (1, 'Personal Care', 'CAT-CARE', 'Soap, shampoo, toothpaste', 3),
+    (1, 'Beverages & Drinks', 'CAT-BEV', 'Tea, coffee, juice', 4),
+    (1, 'General & Household', 'CAT-GENERAL', 'Cleaning supplies & utensils', 5);
+END
+
+IF NOT EXISTS (SELECT * FROM sys.tables WHERE name = 'V_UnitOfMeasurements')
+BEGIN
+    CREATE TABLE [V_UnitOfMeasurements] (
+        [ID] bigint IDENTITY(1,1) NOT NULL,
+        [TenantId] bigint NOT NULL DEFAULT 1,
+        [UOMName] nvarchar(250) NOT NULL,
+        [UOMCode] nvarchar(100) NOT NULL,
+        [Symbol] nvarchar(50) NOT NULL,
+        [DecimalPrecision] int NOT NULL DEFAULT 0,
+        [Description] nvarchar(max) NULL,
+        [IsActive] bit NOT NULL DEFAULT 1,
+        [IsDeleted] bit NOT NULL DEFAULT 0,
+        [Priority] int NOT NULL DEFAULT 0,
+        [CreatedBy] bigint NOT NULL DEFAULT 0,
+        [CreatedDate] datetime2 NOT NULL DEFAULT GETUTCDATE(),
+        [ModifiedBy] bigint NOT NULL DEFAULT 0,
+        [ModifiedDate] datetime2 NOT NULL DEFAULT GETUTCDATE(),
+        [DeletedBy] bigint NOT NULL DEFAULT 0,
+        [DeletedDate] datetime2 NULL,
+        [EntrySource] nvarchar(100) NOT NULL DEFAULT '',
+        [IPAddress] nvarchar(100) NOT NULL DEFAULT '',
+        CONSTRAINT [PK_V_UnitOfMeasurements] PRIMARY KEY CLUSTERED ([ID] ASC)
+    );
+
+    INSERT INTO [V_UnitOfMeasurements] ([TenantId], [UOMName], [UOMCode], [Symbol], [DecimalPrecision], [Priority])
+    VALUES 
+    (1, 'Kilogram', 'KG', 'kg', 3, 1),
+    (1, 'Gram', 'GM', 'g', 0, 2),
+    (1, 'Liter', 'LTR', 'L', 3, 3),
+    (1, 'Milliliter', 'ML', 'ml', 0, 4),
+    (1, 'Piece', 'PCS', 'pcs', 0, 5),
+    (1, 'Packet', 'PKT', 'pkt', 0, 6),
+    (1, 'Box', 'BOX', 'box', 0, 7),
+    (1, 'Dozen', 'DZN', 'dzn', 0, 8);
+END
+
+IF NOT EXISTS (SELECT * FROM sys.tables WHERE name = 'V_ItemTypes')
+BEGIN
+    CREATE TABLE [V_ItemTypes] (
+        [ID] bigint IDENTITY(1,1) NOT NULL,
+        [TenantId] bigint NOT NULL DEFAULT 1,
+        [ItemTypeName] nvarchar(250) NOT NULL,
+        [ItemTypeCode] nvarchar(100) NULL,
+        [Description] nvarchar(max) NULL,
+        [IsActive] bit NOT NULL DEFAULT 1,
+        [IsDeleted] bit NOT NULL DEFAULT 0,
+        [Priority] int NOT NULL DEFAULT 0,
+        [CreatedBy] bigint NOT NULL DEFAULT 0,
+        [CreatedDate] datetime2 NOT NULL DEFAULT GETUTCDATE(),
+        [ModifiedBy] bigint NOT NULL DEFAULT 0,
+        [ModifiedDate] datetime2 NOT NULL DEFAULT GETUTCDATE(),
+        [DeletedBy] bigint NOT NULL DEFAULT 0,
+        [DeletedDate] datetime2 NULL,
+        [EntrySource] nvarchar(100) NOT NULL DEFAULT '',
+        [IPAddress] nvarchar(100) NOT NULL DEFAULT '',
+        CONSTRAINT [PK_V_ItemTypes] PRIMARY KEY CLUSTERED ([ID] ASC)
+    );
+
+    INSERT INTO [V_ItemTypes] ([TenantId], [ItemTypeName], [ItemTypeCode], [Description], [Priority])
+    VALUES 
+    (1, 'Packed Goods', 'PACKED', 'Pre-packaged branded item', 1),
+    (1, 'Loose Goods', 'LOOSE', 'Weighed / loose item', 2),
+    (1, 'Service / Custom', 'SERVICE', 'Non-physical item or custom service', 3);
+END
+
+IF NOT EXISTS (SELECT * FROM sys.tables WHERE name = 'V_Brands')
+BEGIN
+    CREATE TABLE [V_Brands] (
+        [ID] bigint IDENTITY(1,1) NOT NULL,
+        [TenantId] bigint NOT NULL DEFAULT 1,
+        [BrandName] nvarchar(250) NOT NULL,
+        [BrandCode] nvarchar(100) NULL,
+        [Description] nvarchar(max) NULL,
+        [IsActive] bit NOT NULL DEFAULT 1,
+        [IsDeleted] bit NOT NULL DEFAULT 0,
+        [Priority] int NOT NULL DEFAULT 0,
+        [CreatedBy] bigint NOT NULL DEFAULT 0,
+        [CreatedDate] datetime2 NOT NULL DEFAULT GETUTCDATE(),
+        [ModifiedBy] bigint NOT NULL DEFAULT 0,
+        [ModifiedDate] datetime2 NOT NULL DEFAULT GETUTCDATE(),
+        [DeletedBy] bigint NOT NULL DEFAULT 0,
+        [DeletedDate] datetime2 NULL,
+        [EntrySource] nvarchar(100) NOT NULL DEFAULT '',
+        [IPAddress] nvarchar(100) NOT NULL DEFAULT '',
+        CONSTRAINT [PK_V_Brands] PRIMARY KEY CLUSTERED ([ID] ASC)
+    );
+
+    INSERT INTO [V_Brands] ([TenantId], [BrandName], [BrandCode], [Description], [Priority])
+    VALUES 
+    (1, 'General / Local', 'LOCAL', 'Local or unbranded item', 1),
+    (1, 'Amul', 'AMUL', 'Amul India', 2),
+    (1, 'Tata Consumer', 'TATA', 'Tata Products', 3),
+    (1, 'Nestle', 'NESTLE', 'Nestle India', 4);
+END";
+            db.Database.ExecuteSqlRaw(createMastersSql);
         }
         catch (Exception) {}
 
