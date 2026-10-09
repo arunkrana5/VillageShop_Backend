@@ -938,6 +938,8 @@ public class UpiAccountDto
 {
     public string Id { get; set; } = Guid.NewGuid().ToString();
     public string UpiId { get; set; } = "";
+    public string AccountName { get; set; } = "";
+    public string BankName { get; set; } = "";
     public string Label { get; set; } = "Shop UPI";
     public bool IsDefault { get; set; } = false;
 }

@@ -15,6 +15,10 @@ public class SalePayment : BaseTenantEntity
 
     public string? UpiIdUsed { get; set; } // Specific UPI ID (e.g., shopkeeper@okaxis)
 
+    public string? AccountName { get; set; } // Account Name (Holder Name)
+
+    public string? BankName { get; set; } // Bank Name
+
     public string? TransactionRef { get; set; }
 
     public bool IsReceived { get; set; } = true; // True when payment confirmed received

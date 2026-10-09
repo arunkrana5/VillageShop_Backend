@@ -111,6 +111,8 @@ public class SalePaymentDto
     public string PaymentMode { get; set; } = "Cash"; // Cash, UPI, Udhaar, Card
     public decimal Amount { get; set; }
     public string? UpiIdUsed { get; set; }
+    public string? AccountName { get; set; }
+    public string? BankName { get; set; }
     public string? TransactionRef { get; set; }
     public bool IsReceived { get; set; } = true;
     public string? Notes { get; set; }

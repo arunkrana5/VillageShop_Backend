@@ -178,6 +178,8 @@ public class SaleService : ISaleService
                         PaymentMode = pMode,
                         Amount = pAmt,
                         UpiIdUsed = pMode.Equals("UPI", StringComparison.OrdinalIgnoreCase) ? p.UpiIdUsed : null,
+                        AccountName = p.AccountName,
+                        BankName = p.BankName,
                         TransactionRef = p.TransactionRef,
                         IsReceived = p.IsReceived,
                         Notes = p.Notes,
