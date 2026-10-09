@@ -39,10 +39,6 @@ public class ApplicationDbContext : DbContext, IApplicationDbContext
     public DbSet<SyncQueue> SyncQueues => Set<SyncQueue>();
     public DbSet<PushNotification> PushNotifications => Set<PushNotification>();
     public DbSet<UserNotification> UserNotifications => Set<UserNotification>();
-    public DbSet<ItemCategory> ItemCategories => Set<ItemCategory>();
-    public DbSet<UnitOfMeasurement> UnitOfMeasurements => Set<UnitOfMeasurement>();
-    public DbSet<ItemType> ItemTypes => Set<ItemType>();
-    public DbSet<Brand> Brands => Set<Brand>();
     public DbSet<Master> Masters => Set<Master>();
 
     public long CurrentTenantId => _currentTenantService != null && _currentTenantService.TenantId > 0 ? _currentTenantService.TenantId : 1;
@@ -164,10 +160,6 @@ public class ApplicationDbContext : DbContext, IApplicationDbContext
         modelBuilder.Entity<UdhaarLedger>().HasQueryFilter(e => IsSuperAdmin || e.TenantId == CurrentTenantId);
         modelBuilder.Entity<Expense>().HasQueryFilter(e => IsSuperAdmin || e.TenantId == CurrentTenantId);
         modelBuilder.Entity<SyncQueue>().HasQueryFilter(e => IsSuperAdmin || e.TenantId == CurrentTenantId);
-        modelBuilder.Entity<ItemCategory>().HasQueryFilter(e => IsSuperAdmin || e.TenantId == CurrentTenantId);
-        modelBuilder.Entity<UnitOfMeasurement>().HasQueryFilter(e => IsSuperAdmin || e.TenantId == CurrentTenantId);
-        modelBuilder.Entity<ItemType>().HasQueryFilter(e => IsSuperAdmin || e.TenantId == CurrentTenantId);
-        modelBuilder.Entity<Brand>().HasQueryFilter(e => IsSuperAdmin || e.TenantId == CurrentTenantId);
         modelBuilder.Entity<Master>().HasQueryFilter(e => IsSuperAdmin || e.TenantId == CurrentTenantId);
     }
 
