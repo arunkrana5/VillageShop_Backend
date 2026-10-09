@@ -32,6 +32,7 @@ public interface IApplicationDbContext
     DbSet<UnitOfMeasurement> UnitOfMeasurements { get; }
     DbSet<ItemType> ItemTypes { get; }
     DbSet<Brand> Brands { get; }
+    DbSet<Master> Masters { get; }
 
     Task<int> SaveChangesAsync(CancellationToken cancellationToken = default);
 }

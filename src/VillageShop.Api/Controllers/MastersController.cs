@@ -47,359 +47,121 @@ public class MastersController : ControllerBase
     }
 
     // =========================================
-    // 1. CATEGORY MASTERS
+    // 1. UNIFIED GENERIC MASTER ENDPOINTS
     // =========================================
 
-    [HttpGet("categories")]
-    public async Task<IActionResult> GetCategories([FromQuery] long? tenantId, [FromQuery] string? tenantCode, [FromQuery] string? search, [FromQuery] bool activeOnly = false)
+    [HttpGet]
+    public async Task<IActionResult> GetMasters([FromQuery] string? masterType, [FromQuery] long? tenantId, [FromQuery] string? tenantCode, [FromQuery] string? search, [FromQuery] bool activeOnly = false)
     {
         long tId = ResolveTenantId(tenantId, tenantCode);
-        var query = _context.ItemCategories.IgnoreQueryFilters().AsNoTracking().Where(c => c.TenantId == tId && !c.IsDeleted);
+        var query = _context.Masters.IgnoreQueryFilters().AsNoTracking().Where(m => m.TenantId == tId && !m.IsDeleted);
 
-        if (activeOnly) query = query.Where(c => c.IsActive);
+        if (!string.IsNullOrWhiteSpace(masterType))
+        {
+            var mType = masterType.Trim().ToLower();
+            query = query.Where(m => m.MasterType.ToLower() == mType);
+        }
+
+        if (activeOnly) query = query.Where(m => m.IsActive);
         if (!string.IsNullOrWhiteSpace(search))
         {
             var s = search.ToLower();
-            query = query.Where(c => c.CategoryName.ToLower().Contains(s) || (c.CategoryCode != null && c.CategoryCode.ToLower().Contains(s)));
+            query = query.Where(m => m.MasterName.ToLower().Contains(s) || (m.MasterCode != null && m.MasterCode.ToLower().Contains(s)) || (m.Description != null && m.Description.ToLower().Contains(s)));
         }
 
-        var list = await query.OrderBy(c => c.Priority).ThenBy(c => c.CategoryName).ToListAsync();
+        var list = await query.OrderBy(m => m.MasterType).ThenBy(m => m.Priority).ThenBy(m => m.MasterName).ToListAsync();
         return Ok(list);
     }
 
-    [HttpPost("categories")]
-    public async Task<IActionResult> CreateCategory([FromBody] CategoryRequest req)
+    [HttpGet("types")]
+    public async Task<IActionResult> GetMasterTypes([FromQuery] long? tenantId, [FromQuery] string? tenantCode)
     {
-        if (req == null || string.IsNullOrWhiteSpace(req.CategoryName))
-            return BadRequest(PostResponse.Error("Category Name is required."));
+        long tId = ResolveTenantId(tenantId, tenantCode);
+        var types = await _context.Masters.IgnoreQueryFilters().AsNoTracking()
+            .Where(m => m.TenantId == tId && !m.IsDeleted)
+            .Select(m => m.MasterType)
+            .Distinct()
+            .OrderBy(t => t)
+            .ToListAsync();
 
+        return Ok(types);
+    }
+
+    [HttpPost]
+    public async Task<IActionResult> CreateMaster([FromBody] GenericMasterRequest req)
+    {
+        if (req == null || string.IsNullOrWhiteSpace(req.MasterName))
+            return BadRequest(PostResponse.Error("Master Name is required."));
+
+        string masterType = string.IsNullOrWhiteSpace(req.MasterType) ? "General" : req.MasterType.Trim();
         long tId = ResolveTenantId(req.TenantId, req.TenantCode);
 
-        bool exists = await _context.ItemCategories.IgnoreQueryFilters().AnyAsync(c => c.TenantId == tId && c.CategoryName.ToLower() == req.CategoryName.Trim().ToLower() && !c.IsDeleted);
-        if (exists) return BadRequest(PostResponse.Error($"Category '{req.CategoryName}' already exists."));
+        bool exists = await _context.Masters.IgnoreQueryFilters().AnyAsync(m => m.TenantId == tId 
+            && m.MasterType.ToLower() == masterType.ToLower() 
+            && m.MasterName.ToLower() == req.MasterName.Trim().ToLower() 
+            && !m.IsDeleted);
 
-        var entity = new ItemCategory
+        if (exists) return BadRequest(PostResponse.Error($"Master record '{req.MasterName}' already exists under type '{masterType}'."));
+
+        var entity = new Master
         {
             TenantId = tId,
-            CategoryName = req.CategoryName.Trim(),
-            CategoryCode = string.IsNullOrWhiteSpace(req.CategoryCode) ? $"CAT-{DateTime.UtcNow:yyyyMMdd}-{Guid.NewGuid().ToString()[..4].ToUpper()}" : req.CategoryCode.Trim(),
+            MasterType = masterType,
+            MasterName = req.MasterName.Trim(),
+            MasterCode = string.IsNullOrWhiteSpace(req.MasterCode) ? $"{masterType.Substring(0, Math.Min(3, masterType.Length)).ToUpper()}-{DateTime.UtcNow:yyyyMMdd}-{Guid.NewGuid().ToString()[..4].ToUpper()}" : req.MasterCode.Trim(),
             Description = req.Description,
             Priority = req.Priority ?? 0,
             IsActive = true,
             IsDeleted = false
         };
 
-        _context.ItemCategories.Add(entity);
+        _context.Masters.Add(entity);
         await _context.SaveChangesAsync();
 
-        return Ok(PostResponse.Success("Category created successfully.", entity.ID));
+        return Ok(PostResponse.Success("Master record created successfully.", entity.ID));
     }
 
-    [HttpPut("categories/{id}")]
-    public async Task<IActionResult> UpdateCategory(long id, [FromBody] CategoryRequest req)
+    [HttpPut("{id}")]
+    public async Task<IActionResult> UpdateMaster(long id, [FromBody] GenericMasterRequest req)
     {
-        var entity = await _context.ItemCategories.IgnoreQueryFilters().FirstOrDefaultAsync(c => c.ID == id && !c.IsDeleted);
-        if (entity == null) return NotFound(PostResponse.Error("Category not found.", 404));
+        var entity = await _context.Masters.IgnoreQueryFilters().FirstOrDefaultAsync(m => m.ID == id && !m.IsDeleted);
+        if (entity == null) return NotFound(PostResponse.Error("Master record not found.", 404));
 
-        if (!string.IsNullOrWhiteSpace(req.CategoryName)) entity.CategoryName = req.CategoryName.Trim();
-        if (req.CategoryCode != null) entity.CategoryCode = req.CategoryCode.Trim();
+        if (!string.IsNullOrWhiteSpace(req.MasterType)) entity.MasterType = req.MasterType.Trim();
+        if (!string.IsNullOrWhiteSpace(req.MasterName)) entity.MasterName = req.MasterName.Trim();
+        if (req.MasterCode != null) entity.MasterCode = req.MasterCode.Trim();
         if (req.Description != null) entity.Description = req.Description;
         if (req.Priority.HasValue) entity.Priority = req.Priority.Value;
 
         await _context.SaveChangesAsync();
-        return Ok(PostResponse.Success("Category updated successfully.", entity.ID));
+        return Ok(PostResponse.Success("Master record updated successfully.", entity.ID));
     }
 
-    [HttpPut("categories/{id}/toggle-active")]
-    public async Task<IActionResult> ToggleCategoryActive(long id)
+    [HttpPut("{id}/toggle-active")]
+    public async Task<IActionResult> ToggleMasterActive(long id)
     {
-        var entity = await _context.ItemCategories.IgnoreQueryFilters().FirstOrDefaultAsync(c => c.ID == id && !c.IsDeleted);
-        if (entity == null) return NotFound(PostResponse.Error("Category not found.", 404));
+        var entity = await _context.Masters.IgnoreQueryFilters().FirstOrDefaultAsync(m => m.ID == id && !m.IsDeleted);
+        if (entity == null) return NotFound(PostResponse.Error("Master record not found.", 404));
 
         entity.IsActive = !entity.IsActive;
         await _context.SaveChangesAsync();
-        return Ok(PostResponse.Success($"Category is now {(entity.IsActive ? "Active" : "Inactive")}.", entity.ID));
+        return Ok(PostResponse.Success($"Master status changed to {(entity.IsActive ? "Active" : "Inactive")}.", entity.ID));
     }
 
-    [HttpDelete("categories/{id}")]
-    public async Task<IActionResult> DeleteCategory(long id)
+    [HttpDelete("{id}")]
+    public async Task<IActionResult> DeleteMaster(long id)
     {
-        var entity = await _context.ItemCategories.IgnoreQueryFilters().FirstOrDefaultAsync(c => c.ID == id && !c.IsDeleted);
-        if (entity == null) return NotFound(PostResponse.Error("Category not found.", 404));
+        var entity = await _context.Masters.IgnoreQueryFilters().FirstOrDefaultAsync(m => m.ID == id && !m.IsDeleted);
+        if (entity == null) return NotFound(PostResponse.Error("Master record not found.", 404));
 
         entity.IsDeleted = true;
         entity.DeletedDate = DateTime.UtcNow;
         await _context.SaveChangesAsync();
-        return Ok(PostResponse.Success("Category deleted successfully.", entity.ID));
+        return Ok(PostResponse.Success("Master record deleted successfully.", entity.ID));
     }
 
     // =========================================
-    // 2. UOM MASTERS (UNITS OF MEASUREMENT)
-    // =========================================
-
-    [HttpGet("uoms")]
-    public async Task<IActionResult> GetUOMs([FromQuery] long? tenantId, [FromQuery] string? tenantCode, [FromQuery] string? search, [FromQuery] bool activeOnly = false)
-    {
-        long tId = ResolveTenantId(tenantId, tenantCode);
-        var query = _context.UnitOfMeasurements.IgnoreQueryFilters().AsNoTracking().Where(u => u.TenantId == tId && !u.IsDeleted);
-
-        if (activeOnly) query = query.Where(u => u.IsActive);
-        if (!string.IsNullOrWhiteSpace(search))
-        {
-            var s = search.ToLower();
-            query = query.Where(u => u.UOMName.ToLower().Contains(s) || u.UOMCode.ToLower().Contains(s) || u.Symbol.ToLower().Contains(s));
-        }
-
-        var list = await query.OrderBy(u => u.Priority).ThenBy(u => u.UOMName).ToListAsync();
-        return Ok(list);
-    }
-
-    [HttpPost("uoms")]
-    public async Task<IActionResult> CreateUOM([FromBody] UomRequest req)
-    {
-        if (req == null || string.IsNullOrWhiteSpace(req.UOMName))
-            return BadRequest(PostResponse.Error("UOM Name is required."));
-
-        long tId = ResolveTenantId(req.TenantId, req.TenantCode);
-
-        bool exists = await _context.UnitOfMeasurements.IgnoreQueryFilters().AnyAsync(u => u.TenantId == tId && u.UOMName.ToLower() == req.UOMName.Trim().ToLower() && !u.IsDeleted);
-        if (exists) return BadRequest(PostResponse.Error($"UOM '{req.UOMName}' already exists."));
-
-        var entity = new UnitOfMeasurement
-        {
-            TenantId = tId,
-            UOMName = req.UOMName.Trim(),
-            UOMCode = string.IsNullOrWhiteSpace(req.UOMCode) ? req.UOMName.Trim().ToUpper() : req.UOMCode.Trim().ToUpper(),
-            Symbol = string.IsNullOrWhiteSpace(req.Symbol) ? req.UOMName.Trim().ToLower() : req.Symbol.Trim(),
-            DecimalPrecision = req.DecimalPrecision ?? 0,
-            Description = req.Description,
-            Priority = req.Priority ?? 0,
-            IsActive = true,
-            IsDeleted = false
-        };
-
-        _context.UnitOfMeasurements.Add(entity);
-        await _context.SaveChangesAsync();
-
-        return Ok(PostResponse.Success("UOM created successfully.", entity.ID));
-    }
-
-    [HttpPut("uoms/{id}")]
-    public async Task<IActionResult> UpdateUOM(long id, [FromBody] UomRequest req)
-    {
-        var entity = await _context.UnitOfMeasurements.IgnoreQueryFilters().FirstOrDefaultAsync(u => u.ID == id && !u.IsDeleted);
-        if (entity == null) return NotFound(PostResponse.Error("UOM not found.", 404));
-
-        if (!string.IsNullOrWhiteSpace(req.UOMName)) entity.UOMName = req.UOMName.Trim();
-        if (!string.IsNullOrWhiteSpace(req.UOMCode)) entity.UOMCode = req.UOMCode.Trim().ToUpper();
-        if (!string.IsNullOrWhiteSpace(req.Symbol)) entity.Symbol = req.Symbol.Trim();
-        if (req.DecimalPrecision.HasValue) entity.DecimalPrecision = req.DecimalPrecision.Value;
-        if (req.Description != null) entity.Description = req.Description;
-        if (req.Priority.HasValue) entity.Priority = req.Priority.Value;
-
-        await _context.SaveChangesAsync();
-        return Ok(PostResponse.Success("UOM updated successfully.", entity.ID));
-    }
-
-    [HttpPut("uoms/{id}/toggle-active")]
-    public async Task<IActionResult> ToggleUOMActive(long id)
-    {
-        var entity = await _context.UnitOfMeasurements.IgnoreQueryFilters().FirstOrDefaultAsync(u => u.ID == id && !u.IsDeleted);
-        if (entity == null) return NotFound(PostResponse.Error("UOM not found.", 404));
-
-        entity.IsActive = !entity.IsActive;
-        await _context.SaveChangesAsync();
-        return Ok(PostResponse.Success($"UOM is now {(entity.IsActive ? "Active" : "Inactive")}.", entity.ID));
-    }
-
-    [HttpDelete("uoms/{id}")]
-    public async Task<IActionResult> DeleteUOM(long id)
-    {
-        var entity = await _context.UnitOfMeasurements.IgnoreQueryFilters().FirstOrDefaultAsync(u => u.ID == id && !u.IsDeleted);
-        if (entity == null) return NotFound(PostResponse.Error("UOM not found.", 404));
-
-        entity.IsDeleted = true;
-        entity.DeletedDate = DateTime.UtcNow;
-        await _context.SaveChangesAsync();
-        return Ok(PostResponse.Success("UOM deleted successfully.", entity.ID));
-    }
-
-    // =========================================
-    // 3. ITEM TYPE MASTERS
-    // =========================================
-
-    [HttpGet("item-types")]
-    public async Task<IActionResult> GetItemTypes([FromQuery] long? tenantId, [FromQuery] string? tenantCode, [FromQuery] string? search, [FromQuery] bool activeOnly = false)
-    {
-        long tId = ResolveTenantId(tenantId, tenantCode);
-        var query = _context.ItemTypes.IgnoreQueryFilters().AsNoTracking().Where(t => t.TenantId == tId && !t.IsDeleted);
-
-        if (activeOnly) query = query.Where(t => t.IsActive);
-        if (!string.IsNullOrWhiteSpace(search))
-        {
-            var s = search.ToLower();
-            query = query.Where(t => t.ItemTypeName.ToLower().Contains(s));
-        }
-
-        var list = await query.OrderBy(t => t.Priority).ThenBy(t => t.ItemTypeName).ToListAsync();
-        return Ok(list);
-    }
-
-    [HttpPost("item-types")]
-    public async Task<IActionResult> CreateItemType([FromBody] ItemTypeRequest req)
-    {
-        if (req == null || string.IsNullOrWhiteSpace(req.ItemTypeName))
-            return BadRequest(PostResponse.Error("Item Type Name is required."));
-
-        long tId = ResolveTenantId(req.TenantId, req.TenantCode);
-
-        bool exists = await _context.ItemTypes.IgnoreQueryFilters().AnyAsync(t => t.TenantId == tId && t.ItemTypeName.ToLower() == req.ItemTypeName.Trim().ToLower() && !t.IsDeleted);
-        if (exists) return BadRequest(PostResponse.Error($"Item Type '{req.ItemTypeName}' already exists."));
-
-        var entity = new ItemType
-        {
-            TenantId = tId,
-            ItemTypeName = req.ItemTypeName.Trim(),
-            ItemTypeCode = string.IsNullOrWhiteSpace(req.ItemTypeCode) ? req.ItemTypeName.Trim().ToUpper() : req.ItemTypeCode.Trim().ToUpper(),
-            Description = req.Description,
-            Priority = req.Priority ?? 0,
-            IsActive = true,
-            IsDeleted = false
-        };
-
-        _context.ItemTypes.Add(entity);
-        await _context.SaveChangesAsync();
-
-        return Ok(PostResponse.Success("Item Type created successfully.", entity.ID));
-    }
-
-    [HttpPut("item-types/{id}")]
-    public async Task<IActionResult> UpdateItemType(long id, [FromBody] ItemTypeRequest req)
-    {
-        var entity = await _context.ItemTypes.IgnoreQueryFilters().FirstOrDefaultAsync(t => t.ID == id && !t.IsDeleted);
-        if (entity == null) return NotFound(PostResponse.Error("Item Type not found.", 404));
-
-        if (!string.IsNullOrWhiteSpace(req.ItemTypeName)) entity.ItemTypeName = req.ItemTypeName.Trim();
-        if (req.ItemTypeCode != null) entity.ItemTypeCode = req.ItemTypeCode.Trim().ToUpper();
-        if (req.Description != null) entity.Description = req.Description;
-        if (req.Priority.HasValue) entity.Priority = req.Priority.Value;
-
-        await _context.SaveChangesAsync();
-        return Ok(PostResponse.Success("Item Type updated successfully.", entity.ID));
-    }
-
-    [HttpPut("item-types/{id}/toggle-active")]
-    public async Task<IActionResult> ToggleItemTypeActive(long id)
-    {
-        var entity = await _context.ItemTypes.IgnoreQueryFilters().FirstOrDefaultAsync(t => t.ID == id && !t.IsDeleted);
-        if (entity == null) return NotFound(PostResponse.Error("Item Type not found.", 404));
-
-        entity.IsActive = !entity.IsActive;
-        await _context.SaveChangesAsync();
-        return Ok(PostResponse.Success($"Item Type is now {(entity.IsActive ? "Active" : "Inactive")}.", entity.ID));
-    }
-
-    [HttpDelete("item-types/{id}")]
-    public async Task<IActionResult> DeleteItemType(long id)
-    {
-        var entity = await _context.ItemTypes.IgnoreQueryFilters().FirstOrDefaultAsync(t => t.ID == id && !t.IsDeleted);
-        if (entity == null) return NotFound(PostResponse.Error("Item Type not found.", 404));
-
-        entity.IsDeleted = true;
-        entity.DeletedDate = DateTime.UtcNow;
-        await _context.SaveChangesAsync();
-        return Ok(PostResponse.Success("Item Type deleted successfully.", entity.ID));
-    }
-
-    // =========================================
-    // 4. BRAND MASTERS
-    // =========================================
-
-    [HttpGet("brands")]
-    public async Task<IActionResult> GetBrands([FromQuery] long? tenantId, [FromQuery] string? tenantCode, [FromQuery] string? search, [FromQuery] bool activeOnly = false)
-    {
-        long tId = ResolveTenantId(tenantId, tenantCode);
-        var query = _context.Brands.IgnoreQueryFilters().AsNoTracking().Where(b => b.TenantId == tId && !b.IsDeleted);
-
-        if (activeOnly) query = query.Where(b => b.IsActive);
-        if (!string.IsNullOrWhiteSpace(search))
-        {
-            var s = search.ToLower();
-            query = query.Where(b => b.BrandName.ToLower().Contains(s));
-        }
-
-        var list = await query.OrderBy(b => b.Priority).ThenBy(b => b.BrandName).ToListAsync();
-        return Ok(list);
-    }
-
-    [HttpPost("brands")]
-    public async Task<IActionResult> CreateBrand([FromBody] BrandRequest req)
-    {
-        if (req == null || string.IsNullOrWhiteSpace(req.BrandName))
-            return BadRequest(PostResponse.Error("Brand Name is required."));
-
-        long tId = ResolveTenantId(req.TenantId, req.TenantCode);
-
-        bool exists = await _context.Brands.IgnoreQueryFilters().AnyAsync(b => b.TenantId == tId && b.BrandName.ToLower() == req.BrandName.Trim().ToLower() && !b.IsDeleted);
-        if (exists) return BadRequest(PostResponse.Error($"Brand '{req.BrandName}' already exists."));
-
-        var entity = new Brand
-        {
-            TenantId = tId,
-            BrandName = req.BrandName.Trim(),
-            BrandCode = string.IsNullOrWhiteSpace(req.BrandCode) ? req.BrandName.Trim().ToUpper() : req.BrandCode.Trim().ToUpper(),
-            Description = req.Description,
-            Priority = req.Priority ?? 0,
-            IsActive = true,
-            IsDeleted = false
-        };
-
-        _context.Brands.Add(entity);
-        await _context.SaveChangesAsync();
-
-        return Ok(PostResponse.Success("Brand created successfully.", entity.ID));
-    }
-
-    [HttpPut("brands/{id}")]
-    public async Task<IActionResult> UpdateBrand(long id, [FromBody] BrandRequest req)
-    {
-        var entity = await _context.Brands.IgnoreQueryFilters().FirstOrDefaultAsync(b => b.ID == id && !b.IsDeleted);
-        if (entity == null) return NotFound(PostResponse.Error("Brand not found.", 404));
-
-        if (!string.IsNullOrWhiteSpace(req.BrandName)) entity.BrandName = req.BrandName.Trim();
-        if (req.BrandCode != null) entity.BrandCode = req.BrandCode.Trim().ToUpper();
-        if (req.Description != null) entity.Description = req.Description;
-        if (req.Priority.HasValue) entity.Priority = req.Priority.Value;
-
-        await _context.SaveChangesAsync();
-        return Ok(PostResponse.Success("Brand updated successfully.", entity.ID));
-    }
-
-    [HttpPut("brands/{id}/toggle-active")]
-    public async Task<IActionResult> ToggleBrandActive(long id)
-    {
-        var entity = await _context.Brands.IgnoreQueryFilters().FirstOrDefaultAsync(b => b.ID == id && !b.IsDeleted);
-        if (entity == null) return NotFound(PostResponse.Error("Brand not found.", 404));
-
-        entity.IsActive = !entity.IsActive;
-        await _context.SaveChangesAsync();
-        return Ok(PostResponse.Success($"Brand is now {(entity.IsActive ? "Active" : "Inactive")}.", entity.ID));
-    }
-
-    [HttpDelete("brands/{id}")]
-    public async Task<IActionResult> DeleteBrand(long id)
-    {
-        var entity = await _context.Brands.IgnoreQueryFilters().FirstOrDefaultAsync(b => b.ID == id && !b.IsDeleted);
-        if (entity == null) return NotFound(PostResponse.Error("Brand not found.", 404));
-
-        entity.IsDeleted = true;
-        entity.DeletedDate = DateTime.UtcNow;
-        await _context.SaveChangesAsync();
-        return Ok(PostResponse.Success("Brand deleted successfully.", entity.ID));
-    }
-
-    // =========================================
-    // 5. UNIFIED DROPDOWNS API
+    // 2. UNIFIED DROPDOWNS API
     // =========================================
 
     [HttpGet("all-dropdowns")]
@@ -407,78 +169,171 @@ public class MastersController : ControllerBase
     {
         long tId = ResolveTenantId(tenantId, tenantCode);
 
-        var categories = await _context.ItemCategories.IgnoreQueryFilters().AsNoTracking()
-            .Where(c => c.TenantId == tId && c.IsActive && !c.IsDeleted)
-            .OrderBy(c => c.Priority).ThenBy(c => c.CategoryName)
-            .Select(c => new { id = c.ID, name = c.CategoryName, code = c.CategoryCode })
+        var masters = await _context.Masters.IgnoreQueryFilters().AsNoTracking()
+            .Where(m => m.TenantId == tId && m.IsActive && !m.IsDeleted)
+            .OrderBy(m => m.Priority).ThenBy(m => m.MasterName)
             .ToListAsync();
 
-        var uoms = await _context.UnitOfMeasurements.IgnoreQueryFilters().AsNoTracking()
-            .Where(u => u.TenantId == tId && u.IsActive && !u.IsDeleted)
-            .OrderBy(u => u.Priority).ThenBy(u => u.UOMName)
-            .Select(u => new { id = u.ID, name = u.UOMName, code = u.UOMCode, symbol = u.Symbol, precision = u.DecimalPrecision })
-            .ToListAsync();
+        var categories = masters.Where(m => m.MasterType.Equals("ItemCategory", StringComparison.OrdinalIgnoreCase))
+            .Select(m => new { id = m.ID, name = m.MasterName, code = m.MasterCode, categoryName = m.MasterName, categoryCode = m.MasterCode })
+            .ToList();
 
-        var itemTypes = await _context.ItemTypes.IgnoreQueryFilters().AsNoTracking()
-            .Where(t => t.TenantId == tId && t.IsActive && !t.IsDeleted)
-            .OrderBy(t => t.Priority).ThenBy(t => t.ItemTypeName)
-            .Select(t => new { id = t.ID, name = t.ItemTypeName, code = t.ItemTypeCode })
-            .ToListAsync();
+        var uoms = masters.Where(m => m.MasterType.Equals("UnitOfMeasurement", StringComparison.OrdinalIgnoreCase))
+            .Select(m => new { id = m.ID, name = m.MasterName, code = m.MasterCode, symbol = m.MasterCode.ToLower(), uomName = m.MasterName, uomCode = m.MasterCode })
+            .ToList();
 
-        var brands = await _context.Brands.IgnoreQueryFilters().AsNoTracking()
-            .Where(b => b.TenantId == tId && b.IsActive && !b.IsDeleted)
-            .OrderBy(b => b.Priority).ThenBy(b => b.BrandName)
-            .Select(b => new { id = b.ID, name = b.BrandName, code = b.BrandCode })
-            .ToListAsync();
+        var itemTypes = masters.Where(m => m.MasterType.Equals("ItemType", StringComparison.OrdinalIgnoreCase))
+            .Select(m => new { id = m.ID, name = m.MasterName, code = m.MasterCode, itemTypeName = m.MasterName, itemTypeCode = m.MasterCode })
+            .ToList();
+
+        var brands = masters.Where(m => m.MasterType.Equals("Brand", StringComparison.OrdinalIgnoreCase))
+            .Select(m => new { id = m.ID, name = m.MasterName, code = m.MasterCode, brandName = m.MasterName, brandCode = m.MasterCode })
+            .ToList();
 
         return Ok(new
         {
             categories = categories,
             uoms = uoms,
             itemTypes = itemTypes,
-            brands = brands
+            brands = brands,
+            allMasters = masters
         });
     }
+
+    // =========================================
+    // 3. BACKWARDS COMPATIBILITY ROUTE ALIASES
+    // =========================================
+
+    [HttpGet("categories")]
+    public Task<IActionResult> GetCategories([FromQuery] long? tenantId, [FromQuery] string? tenantCode, [FromQuery] string? search, [FromQuery] bool activeOnly = false)
+        => GetMasters("ItemCategory", tenantId, tenantCode, search, activeOnly);
+
+    [HttpPost("categories")]
+    public Task<IActionResult> CreateCategory([FromBody] GenericMasterRequest req)
+    {
+        req.MasterType = "ItemCategory";
+        if (string.IsNullOrWhiteSpace(req.MasterName) && !string.IsNullOrWhiteSpace(req.CategoryName)) req.MasterName = req.CategoryName;
+        if (string.IsNullOrWhiteSpace(req.MasterCode) && !string.IsNullOrWhiteSpace(req.CategoryCode)) req.MasterCode = req.CategoryCode;
+        return CreateMaster(req);
+    }
+
+    [HttpPut("categories/{id}")]
+    public Task<IActionResult> UpdateCategory(long id, [FromBody] GenericMasterRequest req)
+    {
+        req.MasterType = "ItemCategory";
+        if (string.IsNullOrWhiteSpace(req.MasterName) && !string.IsNullOrWhiteSpace(req.CategoryName)) req.MasterName = req.CategoryName;
+        if (string.IsNullOrWhiteSpace(req.MasterCode) && !string.IsNullOrWhiteSpace(req.CategoryCode)) req.MasterCode = req.CategoryCode;
+        return UpdateMaster(id, req);
+    }
+
+    [HttpPut("categories/{id}/toggle-active")]
+    public Task<IActionResult> ToggleCategoryActive(long id) => ToggleMasterActive(id);
+
+    [HttpDelete("categories/{id}")]
+    public Task<IActionResult> DeleteCategory(long id) => DeleteMaster(id);
+
+    [HttpGet("uoms")]
+    public Task<IActionResult> GetUOMs([FromQuery] long? tenantId, [FromQuery] string? tenantCode, [FromQuery] string? search, [FromQuery] bool activeOnly = false)
+        => GetMasters("UnitOfMeasurement", tenantId, tenantCode, search, activeOnly);
+
+    [HttpPost("uoms")]
+    public Task<IActionResult> CreateUOM([FromBody] GenericMasterRequest req)
+    {
+        req.MasterType = "UnitOfMeasurement";
+        if (string.IsNullOrWhiteSpace(req.MasterName) && !string.IsNullOrWhiteSpace(req.UomName)) req.MasterName = req.UomName;
+        if (string.IsNullOrWhiteSpace(req.MasterCode) && !string.IsNullOrWhiteSpace(req.UomCode)) req.MasterCode = req.UomCode;
+        return CreateMaster(req);
+    }
+
+    [HttpPut("uoms/{id}")]
+    public Task<IActionResult> UpdateUOM(long id, [FromBody] GenericMasterRequest req)
+    {
+        req.MasterType = "UnitOfMeasurement";
+        if (string.IsNullOrWhiteSpace(req.MasterName) && !string.IsNullOrWhiteSpace(req.UomName)) req.MasterName = req.UomName;
+        if (string.IsNullOrWhiteSpace(req.MasterCode) && !string.IsNullOrWhiteSpace(req.UomCode)) req.MasterCode = req.UomCode;
+        return UpdateMaster(id, req);
+    }
+
+    [HttpPut("uoms/{id}/toggle-active")]
+    public Task<IActionResult> ToggleUomActive(long id) => ToggleMasterActive(id);
+
+    [HttpDelete("uoms/{id}")]
+    public Task<IActionResult> DeleteUom(long id) => DeleteMaster(id);
+
+    [HttpGet("item-types")]
+    public Task<IActionResult> GetItemTypes([FromQuery] long? tenantId, [FromQuery] string? tenantCode, [FromQuery] string? search, [FromQuery] bool activeOnly = false)
+        => GetMasters("ItemType", tenantId, tenantCode, search, activeOnly);
+
+    [HttpPost("item-types")]
+    public Task<IActionResult> CreateItemType([FromBody] GenericMasterRequest req)
+    {
+        req.MasterType = "ItemType";
+        if (string.IsNullOrWhiteSpace(req.MasterName) && !string.IsNullOrWhiteSpace(req.ItemTypeName)) req.MasterName = req.ItemTypeName;
+        if (string.IsNullOrWhiteSpace(req.MasterCode) && !string.IsNullOrWhiteSpace(req.ItemTypeCode)) req.MasterCode = req.ItemTypeCode;
+        return CreateMaster(req);
+    }
+
+    [HttpPut("item-types/{id}")]
+    public Task<IActionResult> UpdateItemType(long id, [FromBody] GenericMasterRequest req)
+    {
+        req.MasterType = "ItemType";
+        if (string.IsNullOrWhiteSpace(req.MasterName) && !string.IsNullOrWhiteSpace(req.ItemTypeName)) req.MasterName = req.ItemTypeName;
+        if (string.IsNullOrWhiteSpace(req.MasterCode) && !string.IsNullOrWhiteSpace(req.ItemTypeCode)) req.MasterCode = req.ItemTypeCode;
+        return UpdateMaster(id, req);
+    }
+
+    [HttpPut("item-types/{id}/toggle-active")]
+    public Task<IActionResult> ToggleItemTypeActive(long id) => ToggleMasterActive(id);
+
+    [HttpDelete("item-types/{id}")]
+    public Task<IActionResult> DeleteItemType(long id) => DeleteMaster(id);
+
+    [HttpGet("brands")]
+    public Task<IActionResult> GetBrands([FromQuery] long? tenantId, [FromQuery] string? tenantCode, [FromQuery] string? search, [FromQuery] bool activeOnly = false)
+        => GetMasters("Brand", tenantId, tenantCode, search, activeOnly);
+
+    [HttpPost("brands")]
+    public Task<IActionResult> CreateBrand([FromBody] GenericMasterRequest req)
+    {
+        req.MasterType = "Brand";
+        if (string.IsNullOrWhiteSpace(req.MasterName) && !string.IsNullOrWhiteSpace(req.BrandName)) req.MasterName = req.BrandName;
+        if (string.IsNullOrWhiteSpace(req.MasterCode) && !string.IsNullOrWhiteSpace(req.BrandCode)) req.MasterCode = req.BrandCode;
+        return CreateMaster(req);
+    }
+
+    [HttpPut("brands/{id}")]
+    public Task<IActionResult> UpdateBrand(long id, [FromBody] GenericMasterRequest req)
+    {
+        req.MasterType = "Brand";
+        if (string.IsNullOrWhiteSpace(req.MasterName) && !string.IsNullOrWhiteSpace(req.BrandName)) req.MasterName = req.BrandName;
+        if (string.IsNullOrWhiteSpace(req.MasterCode) && !string.IsNullOrWhiteSpace(req.BrandCode)) req.MasterCode = req.BrandCode;
+        return UpdateMaster(id, req);
+    }
+
+    [HttpPut("brands/{id}/toggle-active")]
+    public Task<IActionResult> ToggleBrandActive(long id) => ToggleMasterActive(id);
+
+    [HttpDelete("brands/{id}")]
+    public Task<IActionResult> DeleteBrand(long id) => DeleteMaster(id);
 }
 
-public class CategoryRequest
+public class GenericMasterRequest
 {
     public long? TenantId { get; set; }
     public string? TenantCode { get; set; }
-    public string CategoryName { get; set; } = string.Empty;
+    public string? MasterType { get; set; }
+    public string? MasterName { get; set; }
+    public string? MasterCode { get; set; }
+    public string? Description { get; set; }
+    public int? Priority { get; set; }
+
+    // Legacy JSON payload alias mappings
+    public string? CategoryName { get; set; }
     public string? CategoryCode { get; set; }
-    public string? Description { get; set; }
-    public int? Priority { get; set; }
-}
-
-public class UomRequest
-{
-    public long? TenantId { get; set; }
-    public string? TenantCode { get; set; }
-    public string UOMName { get; set; } = string.Empty;
-    public string? UOMCode { get; set; }
-    public string? Symbol { get; set; }
-    public int? DecimalPrecision { get; set; }
-    public string? Description { get; set; }
-    public int? Priority { get; set; }
-}
-
-public class ItemTypeRequest
-{
-    public long? TenantId { get; set; }
-    public string? TenantCode { get; set; }
-    public string ItemTypeName { get; set; } = string.Empty;
+    public string? UomName { get; set; }
+    public string? UomCode { get; set; }
+    public string? ItemTypeName { get; set; }
     public string? ItemTypeCode { get; set; }
-    public string? Description { get; set; }
-    public int? Priority { get; set; }
-}
-
-public class BrandRequest
-{
-    public long? TenantId { get; set; }
-    public string? TenantCode { get; set; }
-    public string BrandName { get; set; } = string.Empty;
+    public string? BrandName { get; set; }
     public string? BrandCode { get; set; }
-    public string? Description { get; set; }
-    public int? Priority { get; set; }
 }

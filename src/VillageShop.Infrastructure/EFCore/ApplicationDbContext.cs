@@ -43,6 +43,7 @@ public class ApplicationDbContext : DbContext, IApplicationDbContext
     public DbSet<UnitOfMeasurement> UnitOfMeasurements => Set<UnitOfMeasurement>();
     public DbSet<ItemType> ItemTypes => Set<ItemType>();
     public DbSet<Brand> Brands => Set<Brand>();
+    public DbSet<Master> Masters => Set<Master>();
 
     public long CurrentTenantId => _currentTenantService != null && _currentTenantService.TenantId > 0 ? _currentTenantService.TenantId : 1;
     public bool IsSuperAdmin => _currentTenantService?.IsSuperAdmin ?? false;
@@ -167,6 +168,7 @@ public class ApplicationDbContext : DbContext, IApplicationDbContext
         modelBuilder.Entity<UnitOfMeasurement>().HasQueryFilter(e => IsSuperAdmin || e.TenantId == CurrentTenantId);
         modelBuilder.Entity<ItemType>().HasQueryFilter(e => IsSuperAdmin || e.TenantId == CurrentTenantId);
         modelBuilder.Entity<Brand>().HasQueryFilter(e => IsSuperAdmin || e.TenantId == CurrentTenantId);
+        modelBuilder.Entity<Master>().HasQueryFilter(e => IsSuperAdmin || e.TenantId == CurrentTenantId);
     }
 
     public override Task<int> SaveChangesAsync(CancellationToken cancellationToken = default)
