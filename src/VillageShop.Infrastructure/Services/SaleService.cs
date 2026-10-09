@@ -156,15 +156,77 @@ public class SaleService : ISaleService
             discountAmount = (subTotal + totalTax) - finalTotalAmount;
         }
         
-        string paymentMode = string.IsNullOrWhiteSpace(request.PaymentMode) ? "Cash" : request.PaymentMode;
-        decimal paidAmount = request.PaidAmount;
-        if (paymentMode.Equals("Cash", StringComparison.OrdinalIgnoreCase) || paymentMode.Equals("UPI", StringComparison.OrdinalIgnoreCase))
+        decimal paidAmount = 0;
+        decimal udhaarAmount = 0;
+        var salePayments = new List<SalePayment>();
+
+        if (request.Payments != null && request.Payments.Any())
         {
-            if (paidAmount <= 0) paidAmount = finalTotalAmount;
+            foreach (var p in request.Payments)
+            {
+                var pMode = string.IsNullOrWhiteSpace(p.PaymentMode) ? "Cash" : p.PaymentMode;
+                var pAmt = Math.Max(0, p.Amount);
+                if (pAmt > 0 || pMode.Equals("Udhaar", StringComparison.OrdinalIgnoreCase))
+                {
+                    if (!pMode.Equals("Udhaar", StringComparison.OrdinalIgnoreCase) && p.IsReceived)
+                    {
+                        paidAmount += pAmt;
+                    }
+                    salePayments.Add(new SalePayment
+                    {
+                        TenantId = targetTenantId,
+                        PaymentMode = pMode,
+                        Amount = pAmt,
+                        UpiIdUsed = pMode.Equals("UPI", StringComparison.OrdinalIgnoreCase) ? p.UpiIdUsed : null,
+                        TransactionRef = p.TransactionRef,
+                        IsReceived = p.IsReceived,
+                        Notes = p.Notes,
+                        PaymentDate = DateTime.UtcNow
+                    });
+                }
+            }
+
+            if (paidAmount > finalTotalAmount) paidAmount = finalTotalAmount;
+            udhaarAmount = finalTotalAmount - paidAmount;
+            if (udhaarAmount < 0) udhaarAmount = 0;
+        }
+        else
+        {
+            string pMode = string.IsNullOrWhiteSpace(request.PaymentMode) ? "Cash" : request.PaymentMode;
+            paidAmount = request.PaidAmount;
+            if (pMode.Equals("Cash", StringComparison.OrdinalIgnoreCase) || pMode.Equals("UPI", StringComparison.OrdinalIgnoreCase))
+            {
+                if (paidAmount <= 0) paidAmount = finalTotalAmount;
+            }
+
+            udhaarAmount = finalTotalAmount - paidAmount;
+            if (udhaarAmount < 0) udhaarAmount = 0;
+
+            if (paidAmount > 0)
+            {
+                salePayments.Add(new SalePayment
+                {
+                    TenantId = targetTenantId,
+                    PaymentMode = pMode,
+                    Amount = paidAmount,
+                    IsReceived = true,
+                    PaymentDate = DateTime.UtcNow
+                });
+            }
+            if (udhaarAmount > 0)
+            {
+                salePayments.Add(new SalePayment
+                {
+                    TenantId = targetTenantId,
+                    PaymentMode = "Udhaar",
+                    Amount = udhaarAmount,
+                    IsReceived = false,
+                    PaymentDate = DateTime.UtcNow
+                });
+            }
         }
 
-        decimal udhaarAmount = finalTotalAmount - paidAmount;
-        if (udhaarAmount < 0) udhaarAmount = 0;
+        string primaryPaymentMode = salePayments.Count == 1 ? salePayments[0].PaymentMode : (salePayments.Any(x => x.PaymentMode == "Udhaar") ? "Split/Udhaar" : "Split");
 
         var sale = new Sale
         {
@@ -179,9 +241,10 @@ public class SaleService : ISaleService
             TotalAmount = finalTotalAmount,
             PaidAmount = paidAmount,
             UdhaarAmount = udhaarAmount,
-            PaymentMode = paymentMode,
+            PaymentMode = primaryPaymentMode,
             Notes = request.Notes ?? "",
-            SaleItems = saleItems
+            SaleItems = saleItems,
+            SalePayments = salePayments
         };
 
         _context.Sales.Add(sale);
@@ -214,6 +277,7 @@ public class SaleService : ISaleService
         return await _context.Sales
             .IgnoreQueryFilters()
             .Include(s => s.SaleItems)
+            .Include(s => s.SalePayments)
             .Include(s => s.Customer)
             .FirstOrDefaultAsync(s => s.ID == id && !s.IsDeleted);
     }

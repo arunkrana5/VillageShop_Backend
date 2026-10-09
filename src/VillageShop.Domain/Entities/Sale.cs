@@ -33,4 +33,6 @@ public class Sale : BaseTenantEntity
     public string? Notes { get; set; }
 
     public ICollection<SaleItem> SaleItems { get; set; } = new List<SaleItem>();
+
+    public ICollection<SalePayment> SalePayments { get; set; } = new List<SalePayment>();
 }

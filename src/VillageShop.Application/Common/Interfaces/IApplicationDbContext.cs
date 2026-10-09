@@ -21,6 +21,7 @@ public interface IApplicationDbContext
     DbSet<Supplier> Suppliers { get; }
     DbSet<Sale> Sales { get; }
     DbSet<SaleItem> SaleItems { get; }
+    DbSet<SalePayment> SalePayments { get; }
     DbSet<Payment> Payments { get; }
     DbSet<UdhaarLedger> UdhaarLedgers { get; }
     DbSet<Expense> Expenses { get; }

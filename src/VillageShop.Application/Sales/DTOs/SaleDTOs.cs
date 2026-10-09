@@ -102,4 +102,37 @@ public class CreateSaleRequest
     public string Notes { get; set; } = string.Empty;
 
     public List<CreateSaleItemRequest> Items { get; set; } = new();
+
+    public List<SalePaymentDto>? Payments { get; set; }
+}
+
+public class SalePaymentDto
+{
+    public string PaymentMode { get; set; } = "Cash"; // Cash, UPI, Udhaar, Card
+    public decimal Amount { get; set; }
+    public string? UpiIdUsed { get; set; }
+    public string? TransactionRef { get; set; }
+    public bool IsReceived { get; set; } = true;
+    public string? Notes { get; set; }
+}
+
+public class SaleDto
+{
+    public long ID { get; set; }
+    public string InvoiceNumber { get; set; } = string.Empty;
+    public string ClientTransactionId { get; set; } = string.Empty;
+    public long? CustomerId { get; set; }
+    public string? CustomerName { get; set; }
+    public string? CustomerMobile { get; set; }
+    public System.DateTime SaleDate { get; set; }
+    public decimal SubTotal { get; set; }
+    public decimal TaxAmount { get; set; }
+    public decimal DiscountAmount { get; set; }
+    public decimal TotalAmount { get; set; }
+    public decimal PaidAmount { get; set; }
+    public decimal UdhaarAmount { get; set; }
+    public string PaymentMode { get; set; } = "Cash";
+    public string PaymentStatus { get; set; } = "Paid"; // Paid, Partially Paid, Udhaar
+    public string? Notes { get; set; }
+    public List<SalePaymentDto> Payments { get; set; } = new();
 }

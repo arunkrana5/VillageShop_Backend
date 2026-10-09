@@ -51,6 +51,7 @@ public class SalesController : ControllerBase
             .IgnoreQueryFilters()
             .Include(s => s.Customer)
             .Include(s => s.SaleItems)
+            .Include(s => s.SalePayments)
             .AsNoTracking()
             .Where(s => !s.IsDeleted);
 
@@ -67,6 +68,7 @@ public class SalesController : ControllerBase
                 dbId = s.ID,
                 tenantId = s.TenantId,
                 customerName = s.Customer != null ? s.Customer.Name : "Walk-in Customer",
+                customerMobile = s.Customer != null ? s.Customer.Mobile : "",
                 subTotal = (double)s.SubTotal,
                 grossAmount = (double)s.SubTotal,
                 taxAmount = (double)s.TaxAmount,
@@ -78,7 +80,7 @@ public class SalesController : ControllerBase
                 udhaarAmount = (double)s.UdhaarAmount,
                 paymentMode = s.PaymentMode ?? "Cash",
                 createdAt = s.CreatedDate.ToString("yyyy-MM-dd hh:mm tt"),
-                status = s.PaymentMode == "Udhaar" ? "PENDING_CREDIT" : "COMPLETED",
+                status = s.UdhaarAmount > 0 ? (s.PaidAmount > 0 ? "PARTIALLY_PAID" : "PENDING_CREDIT") : "COMPLETED",
                 itemsCount = s.SaleItems.Count > 0 ? s.SaleItems.Count : 1,
                 items = s.SaleItems.Select(si => new
                 {
@@ -88,6 +90,15 @@ public class SalesController : ControllerBase
                     unitPrice = (double)si.UnitPrice,
                     taxPercent = (double)si.TaxPercent,
                     totalAmount = (double)si.TotalAmount
+                }).ToList(),
+                payments = s.SalePayments.Select(sp => new
+                {
+                    paymentMode = sp.PaymentMode,
+                    amount = (double)sp.Amount,
+                    upiIdUsed = sp.UpiIdUsed,
+                    transactionRef = sp.TransactionRef,
+                    isReceived = sp.IsReceived,
+                    paymentDate = sp.PaymentDate.ToString("yyyy-MM-dd hh:mm tt")
                 }).ToList()
             })
             .ToListAsync();
@@ -119,6 +130,7 @@ public class SalesController : ControllerBase
             .IgnoreQueryFilters()
             .Include(s => s.Customer)
             .Include(s => s.SaleItems)
+            .Include(s => s.SalePayments)
             .AsNoTracking()
             .FirstOrDefaultAsync(s => s.InvoiceNumber == id || s.ID.ToString() == id);
 
@@ -129,6 +141,7 @@ public class SalesController : ControllerBase
             id = sale.InvoiceNumber ?? $"INV-{sale.ID}",
             dbId = sale.ID,
             customerName = sale.Customer != null ? sale.Customer.Name : "Walk-in Customer",
+            customerMobile = sale.Customer != null ? sale.Customer.Mobile : "",
             subTotal = (double)sale.SubTotal,
             grossAmount = (double)sale.SubTotal,
             taxAmount = (double)sale.TaxAmount,
@@ -149,6 +162,15 @@ public class SalesController : ControllerBase
                 taxPercent = (double)si.TaxPercent,
                 taxAmount = (double)si.TaxAmount,
                 totalAmount = (double)si.TotalAmount
+            }).ToList(),
+            payments = sale.SalePayments.Select(sp => new
+            {
+                paymentMode = sp.PaymentMode,
+                amount = (double)sp.Amount,
+                upiIdUsed = sp.UpiIdUsed,
+                transactionRef = sp.TransactionRef,
+                isReceived = sp.IsReceived,
+                paymentDate = sp.PaymentDate.ToString("yyyy-MM-dd hh:mm tt")
             }).ToList()
         });
     }

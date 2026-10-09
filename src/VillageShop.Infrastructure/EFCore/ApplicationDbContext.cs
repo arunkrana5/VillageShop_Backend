@@ -32,6 +32,7 @@ public class ApplicationDbContext : DbContext, IApplicationDbContext
     public DbSet<Supplier> Suppliers => Set<Supplier>();
     public DbSet<Sale> Sales => Set<Sale>();
     public DbSet<SaleItem> SaleItems => Set<SaleItem>();
+    public DbSet<SalePayment> SalePayments => Set<SalePayment>();
     public DbSet<Payment> Payments => Set<Payment>();
     public DbSet<UdhaarLedger> UdhaarLedgers => Set<UdhaarLedger>();
     public DbSet<Expense> Expenses => Set<Expense>();
@@ -125,6 +126,11 @@ public class ApplicationDbContext : DbContext, IApplicationDbContext
             entity.Property(p => p.Amount).HasPrecision(18, 2);
         });
 
+        modelBuilder.Entity<SalePayment>(entity =>
+        {
+            entity.Property(sp => sp.Amount).HasPrecision(18, 2);
+        });
+
         modelBuilder.Entity<UdhaarLedger>(entity =>
         {
             entity.Property(u => u.DebitAmount).HasPrecision(18, 2);
@@ -148,6 +154,7 @@ public class ApplicationDbContext : DbContext, IApplicationDbContext
         modelBuilder.Entity<Supplier>().HasQueryFilter(e => IsSuperAdmin || e.TenantId == CurrentTenantId);
         modelBuilder.Entity<Sale>().HasQueryFilter(e => IsSuperAdmin || e.TenantId == CurrentTenantId);
         modelBuilder.Entity<SaleItem>().HasQueryFilter(e => IsSuperAdmin || e.TenantId == CurrentTenantId);
+        modelBuilder.Entity<SalePayment>().HasQueryFilter(e => IsSuperAdmin || e.TenantId == CurrentTenantId);
         modelBuilder.Entity<Payment>().HasQueryFilter(e => IsSuperAdmin || e.TenantId == CurrentTenantId);
         modelBuilder.Entity<UdhaarLedger>().HasQueryFilter(e => IsSuperAdmin || e.TenantId == CurrentTenantId);
         modelBuilder.Entity<Expense>().HasQueryFilter(e => IsSuperAdmin || e.TenantId == CurrentTenantId);

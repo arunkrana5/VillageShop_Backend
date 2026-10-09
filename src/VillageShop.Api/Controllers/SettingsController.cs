@@ -621,6 +621,25 @@ public class SettingsController : ControllerBase
         });
     }
 
+    [HttpGet("upi-accounts")]
+    public async Task<IActionResult> GetUpiAccounts([FromQuery] long? tenantId)
+    {
+        long targetTid = tenantId ?? 1;
+        var config = await GetOrLoadTenantConfigAsync(targetTid);
+        var list = config.UpiAccounts ?? new List<UpiAccountDto>();
+        return Ok(list);
+    }
+
+    [HttpPost("upi-accounts")]
+    public async Task<IActionResult> SaveUpiAccounts([FromBody] List<UpiAccountDto> accounts, [FromQuery] long? tenantId)
+    {
+        long targetTid = tenantId ?? 1;
+        var config = await GetOrLoadTenantConfigAsync(targetTid);
+        config.UpiAccounts = accounts ?? new List<UpiAccountDto>();
+        await UpdateMobileConfig(config, targetTid, null);
+        return Ok(PostResponse.Success("UPI accounts updated successfully."));
+    }
+
     private async Task<MobileTenantConfig> GetOrLoadTenantConfigAsync(long tenantId)
     {
         try
@@ -912,6 +931,15 @@ public class MobileTenantConfig
 
     public List<MenuItemConfig> MenuItems { get; set; } = new List<MenuItemConfig>();
     public List<TenantInfo> Tenants { get; set; } = new List<TenantInfo>();
+    public List<UpiAccountDto> UpiAccounts { get; set; } = new List<UpiAccountDto>();
+}
+
+public class UpiAccountDto
+{
+    public string Id { get; set; } = Guid.NewGuid().ToString();
+    public string UpiId { get; set; } = "";
+    public string Label { get; set; } = "Shop UPI";
+    public bool IsDefault { get; set; } = false;
 }
 
 public class CreateTenantRequest
