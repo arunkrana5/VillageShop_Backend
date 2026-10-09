@@ -250,27 +250,44 @@ public class SaleService : ISaleService
         };
 
         _context.Sales.Add(sale);
+        await _context.SaveChangesAsync();
 
-        // 3. Udhaar / Credit Balance Handling
-        if (targetCustomer != null && udhaarAmount > 0)
+        // 3. Customer Purchase & Udhaar Ledger Tracking
+        if (targetCustomer != null)
         {
-            targetCustomer.CurrentBalance += udhaarAmount;
+            if (udhaarAmount > 0)
+            {
+                targetCustomer.CurrentBalance += udhaarAmount;
+            }
+
+            string txType = udhaarAmount > 0 ? (paidAmount > 0 ? "PARTIAL_SALE" : "CREDIT_SALE") : "SALE";
+            string pDesc;
+            if (salePayments.Any())
+            {
+                var modes = string.Join(", ", salePayments.Select(p => $"{p.PaymentMode}: ₹{p.Amount:F2}"));
+                pDesc = $"Invoice #{invoiceNumber} - Total: ₹{finalTotalAmount:F2} ({modes})";
+            }
+            else
+            {
+                pDesc = $"Invoice #{invoiceNumber} - Total: ₹{finalTotalAmount:F2} (Paid: ₹{paidAmount:F2}, Udhaar: ₹{udhaarAmount:F2})";
+            }
 
             var udhaarLedger = new UdhaarLedger
             {
                 TenantId = targetTenantId,
                 CustomerId = targetCustomer.ID,
+                SaleId = sale.ID,
                 TransactionDate = DateTime.UtcNow,
-                TransactionType = "CREDIT_SALE",
+                TransactionType = txType,
                 DebitAmount = udhaarAmount,
                 CreditAmount = 0,
                 RunningBalance = targetCustomer.CurrentBalance,
-                Description = $"Udhaar Credit for Invoice {invoiceNumber}"
+                Description = pDesc
             };
             _context.UdhaarLedgers.Add(udhaarLedger);
+            await _context.SaveChangesAsync();
         }
 
-        await _context.SaveChangesAsync();
         return PostResponse.Success("Sale completed successfully.", sale.ID, invoiceNumber);
     }
 

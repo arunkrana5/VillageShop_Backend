@@ -192,19 +192,43 @@ public class CustomersController : ControllerBase
             .OrderBy(l => l.TransactionDate)
             .ToListAsync();
 
+        var customerSales = await _context.Sales
+            .IgnoreQueryFilters()
+            .AsNoTracking()
+            .Include(s => s.SalePayments)
+            .Where(s => s.CustomerId == customer.ID && !s.IsDeleted)
+            .ToListAsync();
+
+        var salesDict = customerSales.ToDictionary(s => s.ID);
+
         var resultList = new List<object>();
 
         if (ledgers.Any())
         {
             foreach (var l in ledgers)
             {
+                Sale? linkedSale = l.SaleId.HasValue && salesDict.ContainsKey(l.SaleId.Value) ? salesDict[l.SaleId.Value] : null;
+
+                double totalAmount = (double)(linkedSale?.TotalAmount ?? (l.DebitAmount > 0 ? l.DebitAmount : 0));
+                double paidAmount = (double)(linkedSale?.PaidAmount ?? l.CreditAmount);
+                double cashAmount = (double)(linkedSale?.SalePayments?.Where(p => p.PaymentMode.Equals("Cash", StringComparison.OrdinalIgnoreCase) && p.IsReceived).Sum(p => p.Amount) ?? 0);
+                double upiAmount = (double)(linkedSale?.SalePayments?.Where(p => p.PaymentMode.Equals("UPI", StringComparison.OrdinalIgnoreCase) && p.IsReceived).Sum(p => p.Amount) ?? 0);
+                string invoiceNo = linkedSale?.InvoiceNumber ?? "";
+                string paymentMode = linkedSale?.PaymentMode ?? (l.DebitAmount > 0 ? "Udhaar" : "Payment Received");
+
                 resultList.Add(new
                 {
                     id = l.ID.ToString(),
                     date = l.TransactionDate.ToString("dd MMM yyyy, hh:mm tt"),
                     rawDate = l.TransactionDate,
                     type = l.TransactionType,
+                    invoiceNumber = invoiceNo,
+                    paymentMode = paymentMode,
                     description = l.Description ?? (l.DebitAmount > 0 ? "Debit Sale" : "Payment Credit"),
+                    totalAmount = totalAmount,
+                    paidAmount = paidAmount,
+                    cashAmount = cashAmount,
+                    upiAmount = upiAmount,
                     debit = (double)l.DebitAmount,
                     credit = (double)l.CreditAmount,
                     balance = (double)l.RunningBalance
@@ -213,32 +237,36 @@ public class CustomersController : ControllerBase
         }
         else
         {
-            // Fallback: search sales if no ledger records exist yet
-            var sales = await _context.Sales
-                .IgnoreQueryFilters()
-                .AsNoTracking()
-                .Where(s => s.CustomerId == customer.ID && !s.IsDeleted)
-                .OrderBy(s => s.SaleDate)
-                .ToListAsync();
-
+            // Fallback: build ledger entries directly from sales and payments if UdhaarLedger table was empty for this customer
             decimal running = 0;
-            foreach (var s in sales)
+            foreach (var s in customerSales.OrderBy(s => s.SaleDate))
             {
-                if (s.UdhaarAmount > 0)
+                running += s.UdhaarAmount;
+                double cashAmt = (double)s.SalePayments.Where(p => p.PaymentMode.Equals("Cash", StringComparison.OrdinalIgnoreCase) && p.IsReceived).Sum(p => p.Amount);
+                double upiAmt = (double)s.SalePayments.Where(p => p.PaymentMode.Equals("UPI", StringComparison.OrdinalIgnoreCase) && p.IsReceived).Sum(p => p.Amount);
+
+                string txType = s.UdhaarAmount > 0 ? (s.PaidAmount > 0 ? "PARTIAL_SALE" : "CREDIT_SALE") : "SALE";
+                string desc = s.UdhaarAmount > 0 
+                    ? $"Invoice #{s.InvoiceNumber} (Paid: ₹{s.PaidAmount:F2}, Udhaar: ₹{s.UdhaarAmount:F2})"
+                    : $"Invoice #{s.InvoiceNumber} (Full Paid via {s.PaymentMode})";
+
+                resultList.Add(new
                 {
-                    running += s.UdhaarAmount;
-                    resultList.Add(new
-                    {
-                        id = $"sale-{s.ID}",
-                        date = s.SaleDate.ToString("dd MMM yyyy, hh:mm tt"),
-                        rawDate = s.SaleDate,
-                        type = "CREDIT_SALE",
-                        description = $"Invoice #{s.InvoiceNumber}",
-                        debit = (double)s.UdhaarAmount,
-                        credit = 0.0,
-                        balance = (double)running
-                    });
-                }
+                    id = $"sale-{s.ID}",
+                    date = s.SaleDate.ToString("dd MMM yyyy, hh:mm tt"),
+                    rawDate = s.SaleDate,
+                    type = txType,
+                    invoiceNumber = s.InvoiceNumber,
+                    paymentMode = s.PaymentMode,
+                    description = desc,
+                    totalAmount = (double)s.TotalAmount,
+                    paidAmount = (double)s.PaidAmount,
+                    cashAmount = cashAmt,
+                    upiAmount = upiAmt,
+                    debit = (double)s.UdhaarAmount,
+                    credit = 0.0,
+                    balance = (double)running
+                });
             }
         }
 

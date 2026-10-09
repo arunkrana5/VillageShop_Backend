@@ -321,6 +321,20 @@ BEGIN
     END
 END";
             db.Database.ExecuteSqlRaw(createVSalePaymentsSql);
+
+            var reconcileUdhaarLedgersSql = @"
+IF EXISTS (SELECT * FROM sys.tables WHERE name = 'V_UdhaarLedgers')
+BEGIN
+    IF NOT EXISTS (SELECT * FROM sys.columns WHERE object_id = OBJECT_ID('V_UdhaarLedgers') AND name = 'SaleId')
+    BEGIN
+        ALTER TABLE [V_UdhaarLedgers] ADD [SaleId] bigint NULL;
+    END
+    IF NOT EXISTS (SELECT * FROM sys.columns WHERE object_id = OBJECT_ID('V_UdhaarLedgers') AND name = 'PaymentId')
+    BEGIN
+        ALTER TABLE [V_UdhaarLedgers] ADD [PaymentId] bigint NULL;
+    END
+END";
+            db.Database.ExecuteSqlRaw(reconcileUdhaarLedgersSql);
         }
         catch (Exception) {}
 
