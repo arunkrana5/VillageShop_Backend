@@ -334,9 +334,53 @@ public class GenericMasterRequest
 {
     public long? TenantId { get; set; }
     public string? TenantCode { get; set; }
-    public string? MasterType { get; set; }
-    public string? MasterName { get; set; }
-    public string? MasterCode { get; set; }
+
+    private string? _masterType;
+    public string? MasterType 
+    { 
+        get => _masterType ?? masterType; 
+        set => _masterType = value; 
+    }
+    public string? masterType { get; set; }
+
+    private string? _masterName;
+    public string? MasterName 
+    { 
+        get => _masterName ?? masterName ?? name ?? Name ?? categoryName ?? CategoryName ?? uomName ?? UOMName ?? itemTypeName ?? ItemTypeName ?? brandName ?? BrandName; 
+        set => _masterName = value; 
+    }
+    public string? masterName { get; set; }
+    public string? name { get; set; }
+    public string? Name { get; set; }
+    public string? categoryName { get; set; }
+    public string? CategoryName { get; set; }
+    public string? uomName { get; set; }
+    public string? UOMName { get; set; }
+    public string? itemTypeName { get; set; }
+    public string? ItemTypeName { get; set; }
+    public string? brandName { get; set; }
+    public string? BrandName { get; set; }
+
+    private string? _masterCode;
+    public string? MasterCode 
+    { 
+        get => _masterCode ?? masterCode ?? code ?? Code ?? symbol ?? Symbol ?? categoryCode ?? CategoryCode ?? uomCode ?? UOMCode ?? itemTypeCode ?? ItemTypeCode ?? brandCode ?? BrandCode; 
+        set => _masterCode = value; 
+    }
+    public string? masterCode { get; set; }
+    public string? code { get; set; }
+    public string? Code { get; set; }
+    public string? symbol { get; set; }
+    public string? Symbol { get; set; }
+    public string? categoryCode { get; set; }
+    public string? CategoryCode { get; set; }
+    public string? uomCode { get; set; }
+    public string? UOMCode { get; set; }
+    public string? itemTypeCode { get; set; }
+    public string? ItemTypeCode { get; set; }
+    public string? brandCode { get; set; }
+    public string? BrandCode { get; set; }
+
     public string? Description { get; set; }
     public int? Priority { get; set; }
 }
