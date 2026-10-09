@@ -210,6 +210,117 @@ BEGIN
     END
 END";
             db.Database.ExecuteSqlRaw(alterVCustomersSql);
+
+            var createVSalesSql = @"
+IF NOT EXISTS (SELECT * FROM sys.tables WHERE name = 'V_Sales')
+BEGIN
+    CREATE TABLE [V_Sales] (
+        [ID] bigint IDENTITY(1,1) NOT NULL,
+        [TenantId] bigint NOT NULL,
+        [InvoiceNumber] nvarchar(100) NULL,
+        [ClientTransactionId] nvarchar(100) NULL,
+        [CustomerId] bigint NULL,
+        [SaleDate] datetime2 NOT NULL DEFAULT GETUTCDATE(),
+        [SubTotal] decimal(18,2) NOT NULL DEFAULT 0,
+        [TaxAmount] decimal(18,2) NOT NULL DEFAULT 0,
+        [DiscountAmount] decimal(18,2) NOT NULL DEFAULT 0,
+        [TotalAmount] decimal(18,2) NOT NULL DEFAULT 0,
+        [PaidAmount] decimal(18,2) NOT NULL DEFAULT 0,
+        [UdhaarAmount] decimal(18,2) NOT NULL DEFAULT 0,
+        [PaymentMode] nvarchar(100) NOT NULL DEFAULT 'Cash',
+        [Notes] nvarchar(max) NULL,
+        [IsActive] bit NOT NULL DEFAULT 1,
+        [IsDeleted] bit NOT NULL DEFAULT 0,
+        [Priority] int NOT NULL DEFAULT 0,
+        [CreatedBy] bigint NOT NULL DEFAULT 0,
+        [CreatedDate] datetime2 NOT NULL DEFAULT GETUTCDATE(),
+        [ModifiedBy] bigint NOT NULL DEFAULT 0,
+        [ModifiedDate] datetime2 NOT NULL DEFAULT GETUTCDATE(),
+        [DeletedBy] bigint NOT NULL DEFAULT 0,
+        [DeletedDate] datetime2 NULL,
+        [EntrySource] nvarchar(100) NOT NULL DEFAULT '',
+        [IPAddress] nvarchar(100) NOT NULL DEFAULT '',
+        CONSTRAINT [PK_V_Sales] PRIMARY KEY CLUSTERED ([ID] ASC)
+    );
+END";
+            db.Database.ExecuteSqlRaw(createVSalesSql);
+
+            var createVSaleItemsSql = @"
+IF NOT EXISTS (SELECT * FROM sys.tables WHERE name = 'V_SaleItems')
+BEGIN
+    CREATE TABLE [V_SaleItems] (
+        [ID] bigint IDENTITY(1,1) NOT NULL,
+        [TenantId] bigint NOT NULL,
+        [SaleId] bigint NOT NULL,
+        [ProductId] bigint NOT NULL DEFAULT 0,
+        [ProductName] nvarchar(250) NOT NULL DEFAULT '',
+        [Quantity] decimal(18,3) NOT NULL DEFAULT 1,
+        [UnitPrice] decimal(18,2) NOT NULL DEFAULT 0,
+        [TaxPercent] decimal(5,2) NOT NULL DEFAULT 0,
+        [TaxAmount] decimal(18,2) NOT NULL DEFAULT 0,
+        [TotalAmount] decimal(18,2) NOT NULL DEFAULT 0,
+        [IsActive] bit NOT NULL DEFAULT 1,
+        [IsDeleted] bit NOT NULL DEFAULT 0,
+        [Priority] int NOT NULL DEFAULT 0,
+        [CreatedBy] bigint NOT NULL DEFAULT 0,
+        [CreatedDate] datetime2 NOT NULL DEFAULT GETUTCDATE(),
+        [ModifiedBy] bigint NOT NULL DEFAULT 0,
+        [ModifiedDate] datetime2 NOT NULL DEFAULT GETUTCDATE(),
+        [DeletedBy] bigint NOT NULL DEFAULT 0,
+        [DeletedDate] datetime2 NULL,
+        [EntrySource] nvarchar(100) NOT NULL DEFAULT '',
+        [IPAddress] nvarchar(100) NOT NULL DEFAULT '',
+        CONSTRAINT [PK_V_SaleItems] PRIMARY KEY CLUSTERED ([ID] ASC)
+    );
+END";
+            db.Database.ExecuteSqlRaw(createVSaleItemsSql);
+
+            var createVSalePaymentsSql = @"
+IF NOT EXISTS (SELECT * FROM sys.tables WHERE name = 'V_SalePayments')
+BEGIN
+    CREATE TABLE [V_SalePayments] (
+        [ID] bigint IDENTITY(1,1) NOT NULL,
+        [TenantId] bigint NOT NULL,
+        [SaleId] bigint NOT NULL,
+        [PaymentMode] nvarchar(100) NOT NULL DEFAULT 'Cash',
+        [Amount] decimal(18,2) NOT NULL DEFAULT 0,
+        [UpiIdUsed] nvarchar(250) NULL,
+        [AccountName] nvarchar(250) NULL,
+        [BankName] nvarchar(250) NULL,
+        [TransactionRef] nvarchar(250) NULL,
+        [IsReceived] bit NOT NULL DEFAULT 1,
+        [Notes] nvarchar(max) NULL,
+        [PaymentDate] datetime2 NOT NULL DEFAULT GETUTCDATE(),
+        [IsActive] bit NOT NULL DEFAULT 1,
+        [IsDeleted] bit NOT NULL DEFAULT 0,
+        [Priority] int NOT NULL DEFAULT 0,
+        [CreatedBy] bigint NOT NULL DEFAULT 0,
+        [CreatedDate] datetime2 NOT NULL DEFAULT GETUTCDATE(),
+        [ModifiedBy] bigint NOT NULL DEFAULT 0,
+        [ModifiedDate] datetime2 NOT NULL DEFAULT GETUTCDATE(),
+        [DeletedBy] bigint NOT NULL DEFAULT 0,
+        [DeletedDate] datetime2 NULL,
+        [EntrySource] nvarchar(100) NOT NULL DEFAULT '',
+        [IPAddress] nvarchar(100) NOT NULL DEFAULT '',
+        CONSTRAINT [PK_V_SalePayments] PRIMARY KEY CLUSTERED ([ID] ASC)
+    );
+END
+ELSE
+BEGIN
+    IF NOT EXISTS (SELECT * FROM sys.columns WHERE object_id = OBJECT_ID('V_SalePayments') AND name = 'UpiIdUsed')
+    BEGIN
+        ALTER TABLE [V_SalePayments] ADD [UpiIdUsed] nvarchar(250) NULL;
+    END
+    IF NOT EXISTS (SELECT * FROM sys.columns WHERE object_id = OBJECT_ID('V_SalePayments') AND name = 'AccountName')
+    BEGIN
+        ALTER TABLE [V_SalePayments] ADD [AccountName] nvarchar(250) NULL;
+    END
+    IF NOT EXISTS (SELECT * FROM sys.columns WHERE object_id = OBJECT_ID('V_SalePayments') AND name = 'BankName')
+    BEGIN
+        ALTER TABLE [V_SalePayments] ADD [BankName] nvarchar(250) NULL;
+    END
+END";
+            db.Database.ExecuteSqlRaw(createVSalePaymentsSql);
         }
         catch (Exception) {}
 

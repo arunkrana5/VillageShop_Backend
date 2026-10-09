@@ -47,63 +47,127 @@ public class SalesController : ControllerBase
             if (tenant != null) targetTenantId = tenant.ID;
         }
 
-        var query = _context.Sales
-            .IgnoreQueryFilters()
-            .Include(s => s.Customer)
-            .Include(s => s.SaleItems)
-            .Include(s => s.SalePayments)
-            .AsNoTracking()
-            .Where(s => !s.IsDeleted);
-
-        if (targetTenantId > 0)
+        try
         {
-            query = query.Where(s => s.TenantId == targetTenantId);
-        }
+            var query = _context.Sales
+                .IgnoreQueryFilters()
+                .Include(s => s.Customer)
+                .Include(s => s.SaleItems)
+                .Include(s => s.SalePayments)
+                .AsNoTracking()
+                .Where(s => !s.IsDeleted);
 
-        var sales = await query
-            .OrderByDescending(s => s.ID)
-            .Select(s => new
+            if (targetTenantId > 0)
             {
-                id = s.InvoiceNumber ?? $"INV-{s.ID}",
-                dbId = s.ID,
-                tenantId = s.TenantId,
-                customerName = s.Customer != null ? s.Customer.Name : "Walk-in Customer",
-                customerMobile = s.Customer != null ? s.Customer.Mobile : "",
-                subTotal = (double)s.SubTotal,
-                grossAmount = (double)s.SubTotal,
-                taxAmount = (double)s.TaxAmount,
-                discountAmount = (double)s.DiscountAmount,
-                discount = (double)s.DiscountAmount,
-                totalAmount = (double)s.TotalAmount,
-                netAmount = (double)s.TotalAmount,
-                paidAmount = (double)s.PaidAmount,
-                udhaarAmount = (double)s.UdhaarAmount,
-                paymentMode = s.PaymentMode ?? "Cash",
-                createdAt = s.CreatedDate.ToString("yyyy-MM-dd hh:mm tt"),
-                status = s.UdhaarAmount > 0 ? (s.PaidAmount > 0 ? "PARTIALLY_PAID" : "PENDING_CREDIT") : "COMPLETED",
-                itemsCount = s.SaleItems.Count > 0 ? s.SaleItems.Count : 1,
-                items = s.SaleItems.Select(si => new
-                {
-                    productId = si.ProductId,
-                    productName = si.ProductName,
-                    quantity = (double)si.Quantity,
-                    unitPrice = (double)si.UnitPrice,
-                    taxPercent = (double)si.TaxPercent,
-                    totalAmount = (double)si.TotalAmount
-                }).ToList(),
-                payments = s.SalePayments.Select(sp => new
-                {
-                    paymentMode = sp.PaymentMode,
-                    amount = (double)sp.Amount,
-                    upiIdUsed = sp.UpiIdUsed,
-                    transactionRef = sp.TransactionRef,
-                    isReceived = sp.IsReceived,
-                    paymentDate = sp.PaymentDate.ToString("yyyy-MM-dd hh:mm tt")
-                }).ToList()
-            })
-            .ToListAsync();
+                query = query.Where(s => s.TenantId == targetTenantId);
+            }
 
-        return Ok(sales);
+            var sales = await query
+                .OrderByDescending(s => s.ID)
+                .Select(s => new
+                {
+                    id = s.InvoiceNumber ?? $"INV-{s.ID}",
+                    dbId = s.ID,
+                    tenantId = s.TenantId,
+                    customerName = s.Customer != null ? s.Customer.Name : "Walk-in Customer",
+                    customerMobile = s.Customer != null ? s.Customer.Mobile : "",
+                    subTotal = (double)s.SubTotal,
+                    grossAmount = (double)s.SubTotal,
+                    taxAmount = (double)s.TaxAmount,
+                    discountAmount = (double)s.DiscountAmount,
+                    discount = (double)s.DiscountAmount,
+                    totalAmount = (double)s.TotalAmount,
+                    netAmount = (double)s.TotalAmount,
+                    paidAmount = (double)s.PaidAmount,
+                    udhaarAmount = (double)s.UdhaarAmount,
+                    paymentMode = s.PaymentMode ?? "Cash",
+                    createdAt = s.CreatedDate.ToString("yyyy-MM-dd hh:mm tt"),
+                    status = s.UdhaarAmount > 0 ? (s.PaidAmount > 0 ? "PARTIALLY_PAID" : "PENDING_CREDIT") : "COMPLETED",
+                    itemsCount = s.SaleItems.Count > 0 ? s.SaleItems.Count : 1,
+                    items = s.SaleItems.Select(si => new
+                    {
+                        productId = si.ProductId,
+                        productName = si.ProductName,
+                        quantity = (double)si.Quantity,
+                        unitPrice = (double)si.UnitPrice,
+                        taxPercent = (double)si.TaxPercent,
+                        totalAmount = (double)si.TotalAmount
+                    }).ToList(),
+                    payments = s.SalePayments.Select(sp => new
+                    {
+                        paymentMode = sp.PaymentMode,
+                        amount = (double)sp.Amount,
+                        upiIdUsed = sp.UpiIdUsed,
+                        accountName = sp.AccountName,
+                        bankName = sp.BankName,
+                        transactionRef = sp.TransactionRef,
+                        isReceived = sp.IsReceived,
+                        paymentDate = sp.PaymentDate.ToString("yyyy-MM-dd hh:mm tt")
+                    }).ToList()
+                })
+                .ToListAsync();
+
+            return Ok(sales);
+        }
+        catch (System.Exception ex)
+        {
+            // Fallback query without SalePayments if V_SalePayments table is missing or migrating
+            try
+            {
+                var fallbackQuery = _context.Sales
+                    .IgnoreQueryFilters()
+                    .Include(s => s.Customer)
+                    .Include(s => s.SaleItems)
+                    .AsNoTracking()
+                    .Where(s => !s.IsDeleted);
+
+                if (targetTenantId > 0)
+                {
+                    fallbackQuery = fallbackQuery.Where(s => s.TenantId == targetTenantId);
+                }
+
+                var fallbackSales = await fallbackQuery
+                    .OrderByDescending(s => s.ID)
+                    .Select(s => new
+                    {
+                        id = s.InvoiceNumber ?? $"INV-{s.ID}",
+                        dbId = s.ID,
+                        tenantId = s.TenantId,
+                        customerName = s.Customer != null ? s.Customer.Name : "Walk-in Customer",
+                        customerMobile = s.Customer != null ? s.Customer.Mobile : "",
+                        subTotal = (double)s.SubTotal,
+                        grossAmount = (double)s.SubTotal,
+                        taxAmount = (double)s.TaxAmount,
+                        discountAmount = (double)s.DiscountAmount,
+                        discount = (double)s.DiscountAmount,
+                        totalAmount = (double)s.TotalAmount,
+                        netAmount = (double)s.TotalAmount,
+                        paidAmount = (double)s.PaidAmount,
+                        udhaarAmount = (double)s.UdhaarAmount,
+                        paymentMode = s.PaymentMode ?? "Cash",
+                        createdAt = s.CreatedDate.ToString("yyyy-MM-dd hh:mm tt"),
+                        status = s.UdhaarAmount > 0 ? (s.PaidAmount > 0 ? "PARTIALLY_PAID" : "PENDING_CREDIT") : "COMPLETED",
+                        itemsCount = s.SaleItems.Count > 0 ? s.SaleItems.Count : 1,
+                        items = s.SaleItems.Select(si => new
+                        {
+                            productId = si.ProductId,
+                            productName = si.ProductName,
+                            quantity = (double)si.Quantity,
+                            unitPrice = (double)si.UnitPrice,
+                            taxPercent = (double)si.TaxPercent,
+                            totalAmount = (double)si.TotalAmount
+                        }).ToList(),
+                        payments = new System.Collections.Generic.List<object>()
+                    })
+                    .ToListAsync();
+
+                return Ok(fallbackSales);
+            }
+            catch (System.Exception)
+            {
+                return Ok(new System.Collections.Generic.List<object>());
+            }
+        }
     }
 
     [HttpPost]
