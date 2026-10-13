@@ -42,6 +42,15 @@ public class MastersController : ControllerBase
             if (tenant != null) targetTenantId = tenant.ID;
         }
 
+        if (targetTenantId <= 0 && User?.Claims != null)
+        {
+            var claim = User.Claims.FirstOrDefault(c => c.Type == "TenantId" || c.Type == "tenant_id" || c.Type == "tenantId");
+            if (claim != null && long.TryParse(claim.Value, out var cTid) && cTid > 0)
+            {
+                targetTenantId = cTid;
+            }
+        }
+
         if (targetTenantId <= 0) targetTenantId = 1;
         return targetTenantId;
     }
@@ -54,8 +63,15 @@ public class MastersController : ControllerBase
     public async Task<IActionResult> GetMasters([FromQuery] string? masterType, [FromQuery] long? tenantId, [FromQuery] string? tenantCode, [FromQuery] string? search, [FromQuery] bool activeOnly = false, [FromQuery] int page = 1, [FromQuery] int pageSize = 0)
     {
         long tId = ResolveTenantId(tenantId, tenantCode);
-        var query = _context.Masters.IgnoreQueryFilters().AsNoTracking().Where(m => m.TenantId == tId && !m.IsDeleted);
+        var baseQuery = _context.Masters.IgnoreQueryFilters().AsNoTracking().Where(m => m.TenantId == tId && !m.IsDeleted);
 
+        // If tenant has no custom masters, fallback to global default masters from Tenant 1
+        if (tId != 1 && !await baseQuery.AnyAsync())
+        {
+            baseQuery = _context.Masters.IgnoreQueryFilters().AsNoTracking().Where(m => m.TenantId == 1 && !m.IsDeleted);
+        }
+
+        var query = baseQuery;
         if (!string.IsNullOrWhiteSpace(masterType))
         {
             var mType = masterType.Trim().ToLower();
@@ -217,8 +233,16 @@ public class MastersController : ControllerBase
     {
         long tId = ResolveTenantId(tenantId, tenantCode);
 
-        var masters = await _context.Masters.IgnoreQueryFilters().AsNoTracking()
-            .Where(m => m.TenantId == tId && m.IsActive && !m.IsDeleted)
+        var baseQuery = _context.Masters.IgnoreQueryFilters().AsNoTracking()
+            .Where(m => m.TenantId == tId && m.IsActive && !m.IsDeleted);
+
+        if (tId != 1 && !await baseQuery.AnyAsync())
+        {
+            baseQuery = _context.Masters.IgnoreQueryFilters().AsNoTracking()
+                .Where(m => m.TenantId == 1 && m.IsActive && !m.IsDeleted);
+        }
+
+        var masters = await baseQuery
             .OrderBy(m => m.Priority).ThenBy(m => m.MasterName)
             .Select(m => new { id = m.ID, masterType = m.MasterType, masterName = m.MasterName, masterCode = m.MasterCode, name = m.MasterName, code = m.MasterCode })
             .ToListAsync();
