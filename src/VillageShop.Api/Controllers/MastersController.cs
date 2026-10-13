@@ -98,39 +98,22 @@ public class MastersController : ControllerBase
             .Select(m => new
             {
                 id = m.ID,
-                ID = m.ID,
                 tenantId = m.TenantId,
-                TenantId = m.TenantId,
                 masterType = m.MasterType,
-                MasterType = m.MasterType,
                 masterName = string.IsNullOrWhiteSpace(m.MasterName) ? "Master Item #" + m.ID : m.MasterName,
-                MasterName = string.IsNullOrWhiteSpace(m.MasterName) ? "Master Item #" + m.ID : m.MasterName,
                 name = string.IsNullOrWhiteSpace(m.MasterName) ? "Master Item #" + m.ID : m.MasterName,
-                Name = string.IsNullOrWhiteSpace(m.MasterName) ? "Master Item #" + m.ID : m.MasterName,
                 masterCode = m.MasterCode ?? "",
-                MasterCode = m.MasterCode ?? "",
                 code = m.MasterCode ?? "",
-                Code = m.MasterCode ?? "",
                 description = m.Description ?? "",
-                Description = m.Description ?? "",
                 priority = m.Priority,
-                Priority = m.Priority,
                 isActive = m.IsActive,
-                IsActive = m.IsActive,
                 isDeleted = m.IsDeleted,
-                IsDeleted = m.IsDeleted,
                 createdBy = m.CreatedBy,
-                CreatedBy = m.CreatedBy,
                 createdDate = m.CreatedDate.ToString("o"),
-                CreatedDate = m.CreatedDate.ToString("o"),
                 modifiedBy = m.ModifiedBy,
-                ModifiedBy = m.ModifiedBy,
                 modifiedDate = m.ModifiedDate.ToString("o"),
-                ModifiedDate = m.ModifiedDate.ToString("o"),
                 entrySource = m.EntrySource ?? "API",
-                EntrySource = m.EntrySource ?? "API",
-                ipAddress = m.IPAddress ?? "127.0.0.1",
-                IPAddress = m.IPAddress ?? "127.0.0.1"
+                ipAddress = m.IPAddress ?? "127.0.0.1"
             })
             .ToListAsync();
 
