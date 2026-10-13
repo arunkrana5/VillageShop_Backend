@@ -30,6 +30,8 @@ public class Sale : BaseTenantEntity
 
     public string PaymentMode { get; set; } = "Cash";
 
+    public long? PaymentModeId { get; set; }
+
     public string? Notes { get; set; }
 
     public ICollection<SaleItem> SaleItems { get; set; } = new List<SaleItem>();

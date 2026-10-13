@@ -35,15 +35,43 @@ public class StockService : IStockService
         }
         if (targetTenantId <= 0) targetTenantId = 1;
 
+        var categoryStr = request.Category;
+        long? catId = request.CategoryId;
+        if (catId.HasValue && catId.Value > 0 && string.IsNullOrWhiteSpace(categoryStr))
+        {
+            var catMaster = await _context.Masters.IgnoreQueryFilters().FirstOrDefaultAsync(m => m.ID == catId.Value && !m.IsDeleted);
+            if (catMaster != null) categoryStr = catMaster.MasterName;
+        }
+
+        var brandStr = request.Brand;
+        long? bId = request.BrandId;
+        if (bId.HasValue && bId.Value > 0 && string.IsNullOrWhiteSpace(brandStr))
+        {
+            var bMaster = await _context.Masters.IgnoreQueryFilters().FirstOrDefaultAsync(m => m.ID == bId.Value && !m.IsDeleted);
+            if (bMaster != null) brandStr = bMaster.MasterName;
+        }
+
+        var unitStr = request.Unit ?? "pcs";
+        long? uId = request.UnitId;
+        if (uId.HasValue && uId.Value > 0 && string.IsNullOrWhiteSpace(request.Unit))
+        {
+            var uMaster = await _context.Masters.IgnoreQueryFilters().FirstOrDefaultAsync(m => m.ID == uId.Value && !m.IsDeleted);
+            if (uMaster != null) unitStr = uMaster.MasterName;
+        }
+
         var product = new Stock
         {
             ItemId = request.ItemId,
             TenantId = targetTenantId,
             ProductCode = string.IsNullOrWhiteSpace(request.ProductCode) ? $"PRD-{Guid.NewGuid().ToString()[..6].ToUpper()}" : request.ProductCode,
             Name = request.Name,
-            Category = request.Category,
-            Brand = request.Brand,
-            Unit = request.Unit ?? "pcs",
+            Category = categoryStr,
+            CategoryId = catId,
+            Brand = brandStr,
+            BrandId = bId,
+            Unit = unitStr,
+            UnitId = uId,
+            TaxId = request.TaxId,
             Barcode = request.Barcode,
             PurchasePrice = request.PurchasePrice,
             SellingPrice = request.SellingPrice,
@@ -87,8 +115,30 @@ public class StockService : IStockService
         if (!string.IsNullOrWhiteSpace(request.Name)) product.Name = request.Name;
         if (request.ItemId.HasValue && request.ItemId > 0) product.ItemId = request.ItemId;
         if (!string.IsNullOrWhiteSpace(request.Category)) product.Category = request.Category;
+        if (request.CategoryId.HasValue) product.CategoryId = request.CategoryId.Value;
+        if (product.CategoryId.HasValue && product.CategoryId.Value > 0 && string.IsNullOrWhiteSpace(product.Category))
+        {
+            var catMaster = await _context.Masters.IgnoreQueryFilters().FirstOrDefaultAsync(m => m.ID == product.CategoryId.Value && !m.IsDeleted);
+            if (catMaster != null) product.Category = catMaster.MasterName;
+        }
+
         if (!string.IsNullOrWhiteSpace(request.Brand)) product.Brand = request.Brand;
+        if (request.BrandId.HasValue) product.BrandId = request.BrandId.Value;
+        if (product.BrandId.HasValue && product.BrandId.Value > 0 && string.IsNullOrWhiteSpace(product.Brand))
+        {
+            var bMaster = await _context.Masters.IgnoreQueryFilters().FirstOrDefaultAsync(m => m.ID == product.BrandId.Value && !m.IsDeleted);
+            if (bMaster != null) product.Brand = bMaster.MasterName;
+        }
+
         if (!string.IsNullOrWhiteSpace(request.Unit)) product.Unit = request.Unit;
+        if (request.UnitId.HasValue) product.UnitId = request.UnitId.Value;
+        if (product.UnitId.HasValue && product.UnitId.Value > 0 && string.IsNullOrWhiteSpace(product.Unit))
+        {
+            var uMaster = await _context.Masters.IgnoreQueryFilters().FirstOrDefaultAsync(m => m.ID == product.UnitId.Value && !m.IsDeleted);
+            if (uMaster != null) product.Unit = uMaster.MasterName;
+        }
+
+        if (request.TaxId.HasValue) product.TaxId = request.TaxId.Value;
         if (!string.IsNullOrWhiteSpace(request.Barcode)) product.Barcode = request.Barcode;
         if (request.PurchasePrice > 0) product.PurchasePrice = request.PurchasePrice;
         if (request.SellingPrice > 0) product.SellingPrice = request.SellingPrice;

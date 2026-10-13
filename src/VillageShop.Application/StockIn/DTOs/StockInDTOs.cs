@@ -15,10 +15,15 @@ public class CreateStockInRequest
     public string Name { get; set; } = string.Empty;
 
     public string? Category { get; set; }
+    public long? CategoryId { get; set; }
 
     public string? Brand { get; set; }
+    public long? BrandId { get; set; }
 
     public string? Unit { get; set; }
+    public long? UnitId { get; set; }
+
+    public long? TaxId { get; set; }
 
     public string? Barcode { get; set; }
 

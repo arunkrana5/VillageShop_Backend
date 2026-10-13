@@ -142,6 +142,8 @@ public class SaleService : ISaleService
                 Quantity = itemQty,
                 UnitPrice = itemPrice,
                 TaxPercent = item.TaxPercent,
+                TaxId = item.TaxId,
+                UnitId = item.UnitId,
                 TaxAmount = itemTax,
                 TotalAmount = itemTotal
             });
@@ -176,6 +178,7 @@ public class SaleService : ISaleService
                     {
                         TenantId = targetTenantId,
                         PaymentMode = pMode,
+                        PaymentModeId = p.PaymentModeId,
                         Amount = pAmt,
                         UpiIdUsed = pMode.Equals("UPI", StringComparison.OrdinalIgnoreCase) ? p.UpiIdUsed : null,
                         AccountName = p.AccountName,
@@ -244,6 +247,7 @@ public class SaleService : ISaleService
             PaidAmount = paidAmount,
             UdhaarAmount = udhaarAmount,
             PaymentMode = primaryPaymentMode,
+            PaymentModeId = request.PaymentModeId,
             Notes = request.Notes ?? "",
             SaleItems = saleItems,
             SalePayments = salePayments

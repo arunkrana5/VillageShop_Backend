@@ -53,6 +53,8 @@ public class CreateSaleItemRequest
     }
 
     public decimal TaxPercent { get; set; }
+    public long? TaxId { get; set; }
+    public long? UnitId { get; set; }
 }
 
 public class CreateSaleRequest
@@ -98,6 +100,7 @@ public class CreateSaleRequest
     public decimal PaidAmount { get; set; }
 
     public string PaymentMode { get; set; } = "Cash";
+    public long? PaymentModeId { get; set; }
 
     public string Notes { get; set; } = string.Empty;
 
@@ -109,6 +112,7 @@ public class CreateSaleRequest
 public class SalePaymentDto
 {
     public string PaymentMode { get; set; } = "Cash"; // Cash, UPI, Udhaar, Card
+    public long? PaymentModeId { get; set; }
     public decimal Amount { get; set; }
     public string? UpiIdUsed { get; set; }
     public string? AccountName { get; set; }

@@ -11,6 +11,8 @@ public class SalePayment : BaseTenantEntity
 
     public string PaymentMode { get; set; } = "Cash"; // Cash, UPI, Udhaar, Card
 
+    public long? PaymentModeId { get; set; }
+
     public decimal Amount { get; set; }
 
     public string? UpiIdUsed { get; set; } // Specific UPI ID (e.g., shopkeeper@okaxis)

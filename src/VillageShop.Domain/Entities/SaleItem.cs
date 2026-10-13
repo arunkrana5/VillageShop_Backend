@@ -20,6 +20,10 @@ public class SaleItem : BaseTenantEntity
 
     public decimal TaxPercent { get; set; }
 
+    public long? TaxId { get; set; }
+
+    public long? UnitId { get; set; }
+
     public decimal TaxAmount { get; set; }
 
     public decimal TotalAmount { get; set; }

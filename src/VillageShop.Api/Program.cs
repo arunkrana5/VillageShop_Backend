@@ -122,6 +122,17 @@ BEGIN
         [IPAddress] nvarchar(100) NOT NULL DEFAULT '',
         CONSTRAINT [PK_V_Items] PRIMARY KEY CLUSTERED ([ID] ASC)
     );
+END
+ELSE
+BEGIN
+    IF NOT EXISTS (SELECT * FROM sys.columns WHERE object_id = OBJECT_ID('V_Items') AND name = 'CategoryId')
+        ALTER TABLE [V_Items] ADD [CategoryId] bigint NULL;
+    IF NOT EXISTS (SELECT * FROM sys.columns WHERE object_id = OBJECT_ID('V_Items') AND name = 'UnitId')
+        ALTER TABLE [V_Items] ADD [UnitId] bigint NULL;
+    IF NOT EXISTS (SELECT * FROM sys.columns WHERE object_id = OBJECT_ID('V_Items') AND name = 'ItemTypeId')
+        ALTER TABLE [V_Items] ADD [ItemTypeId] bigint NULL;
+    IF NOT EXISTS (SELECT * FROM sys.columns WHERE object_id = OBJECT_ID('V_Items') AND name = 'BrandId')
+        ALTER TABLE [V_Items] ADD [BrandId] bigint NULL;
 END";
             db.Database.ExecuteSqlRaw(createVItemsSql);
 
@@ -135,8 +146,12 @@ BEGIN
         [ProductCode] nvarchar(100) NOT NULL,
         [Name] nvarchar(250) NOT NULL,
         [Category] nvarchar(150) NULL,
+        [CategoryId] bigint NULL,
         [Brand] nvarchar(150) NULL,
+        [BrandId] bigint NULL,
         [Unit] nvarchar(50) NOT NULL DEFAULT 'pcs',
+        [UnitId] bigint NULL,
+        [TaxId] bigint NULL,
         [Barcode] nvarchar(100) NULL,
         [PurchasePrice] decimal(18,2) NOT NULL DEFAULT 0,
         [SellingPrice] decimal(18,2) NOT NULL DEFAULT 0,
@@ -167,9 +182,15 @@ END
 ELSE
 BEGIN
     IF NOT EXISTS (SELECT * FROM sys.columns WHERE object_id = OBJECT_ID('V_Stock') AND name = 'ItemId')
-    BEGIN
         ALTER TABLE [V_Stock] ADD [ItemId] bigint NULL;
-    END
+    IF NOT EXISTS (SELECT * FROM sys.columns WHERE object_id = OBJECT_ID('V_Stock') AND name = 'CategoryId')
+        ALTER TABLE [V_Stock] ADD [CategoryId] bigint NULL;
+    IF NOT EXISTS (SELECT * FROM sys.columns WHERE object_id = OBJECT_ID('V_Stock') AND name = 'BrandId')
+        ALTER TABLE [V_Stock] ADD [BrandId] bigint NULL;
+    IF NOT EXISTS (SELECT * FROM sys.columns WHERE object_id = OBJECT_ID('V_Stock') AND name = 'UnitId')
+        ALTER TABLE [V_Stock] ADD [UnitId] bigint NULL;
+    IF NOT EXISTS (SELECT * FROM sys.columns WHERE object_id = OBJECT_ID('V_Stock') AND name = 'TaxId')
+        ALTER TABLE [V_Stock] ADD [TaxId] bigint NULL;
 END";
             db.Database.ExecuteSqlRaw(createVStockSql);
 
@@ -242,6 +263,11 @@ BEGIN
         [IPAddress] nvarchar(100) NOT NULL DEFAULT '',
         CONSTRAINT [PK_V_Sales] PRIMARY KEY CLUSTERED ([ID] ASC)
     );
+END
+ELSE
+BEGIN
+    IF NOT EXISTS (SELECT * FROM sys.columns WHERE object_id = OBJECT_ID('V_Sales') AND name = 'PaymentModeId')
+        ALTER TABLE [V_Sales] ADD [PaymentModeId] bigint NULL;
 END";
             db.Database.ExecuteSqlRaw(createVSalesSql);
 
@@ -257,6 +283,8 @@ BEGIN
         [Quantity] decimal(18,3) NOT NULL DEFAULT 1,
         [UnitPrice] decimal(18,2) NOT NULL DEFAULT 0,
         [TaxPercent] decimal(5,2) NOT NULL DEFAULT 0,
+        [TaxId] bigint NULL,
+        [UnitId] bigint NULL,
         [TaxAmount] decimal(18,2) NOT NULL DEFAULT 0,
         [TotalAmount] decimal(18,2) NOT NULL DEFAULT 0,
         [IsActive] bit NOT NULL DEFAULT 1,
@@ -272,6 +300,13 @@ BEGIN
         [IPAddress] nvarchar(100) NOT NULL DEFAULT '',
         CONSTRAINT [PK_V_SaleItems] PRIMARY KEY CLUSTERED ([ID] ASC)
     );
+END
+ELSE
+BEGIN
+    IF NOT EXISTS (SELECT * FROM sys.columns WHERE object_id = OBJECT_ID('V_SaleItems') AND name = 'TaxId')
+        ALTER TABLE [V_SaleItems] ADD [TaxId] bigint NULL;
+    IF NOT EXISTS (SELECT * FROM sys.columns WHERE object_id = OBJECT_ID('V_SaleItems') AND name = 'UnitId')
+        ALTER TABLE [V_SaleItems] ADD [UnitId] bigint NULL;
 END";
             db.Database.ExecuteSqlRaw(createVSaleItemsSql);
 
@@ -283,6 +318,7 @@ BEGIN
         [TenantId] bigint NOT NULL,
         [SaleId] bigint NOT NULL,
         [PaymentMode] nvarchar(100) NOT NULL DEFAULT 'Cash',
+        [PaymentModeId] bigint NULL,
         [Amount] decimal(18,2) NOT NULL DEFAULT 0,
         [UpiIdUsed] nvarchar(250) NULL,
         [AccountName] nvarchar(250) NULL,
@@ -307,18 +343,14 @@ BEGIN
 END
 ELSE
 BEGIN
+    IF NOT EXISTS (SELECT * FROM sys.columns WHERE object_id = OBJECT_ID('V_SalePayments') AND name = 'PaymentModeId')
+        ALTER TABLE [V_SalePayments] ADD [PaymentModeId] bigint NULL;
     IF NOT EXISTS (SELECT * FROM sys.columns WHERE object_id = OBJECT_ID('V_SalePayments') AND name = 'UpiIdUsed')
-    BEGIN
         ALTER TABLE [V_SalePayments] ADD [UpiIdUsed] nvarchar(250) NULL;
-    END
     IF NOT EXISTS (SELECT * FROM sys.columns WHERE object_id = OBJECT_ID('V_SalePayments') AND name = 'AccountName')
-    BEGIN
         ALTER TABLE [V_SalePayments] ADD [AccountName] nvarchar(250) NULL;
-    END
     IF NOT EXISTS (SELECT * FROM sys.columns WHERE object_id = OBJECT_ID('V_SalePayments') AND name = 'BankName')
-    BEGIN
         ALTER TABLE [V_SalePayments] ADD [BankName] nvarchar(250) NULL;
-    END
 END";
             db.Database.ExecuteSqlRaw(createVSalePaymentsSql);
 
@@ -326,13 +358,16 @@ END";
 IF EXISTS (SELECT * FROM sys.tables WHERE name = 'V_UdhaarLedgers')
 BEGIN
     IF NOT EXISTS (SELECT * FROM sys.columns WHERE object_id = OBJECT_ID('V_UdhaarLedgers') AND name = 'SaleId')
-    BEGIN
         ALTER TABLE [V_UdhaarLedgers] ADD [SaleId] bigint NULL;
-    END
     IF NOT EXISTS (SELECT * FROM sys.columns WHERE object_id = OBJECT_ID('V_UdhaarLedgers') AND name = 'PaymentId')
-    BEGIN
         ALTER TABLE [V_UdhaarLedgers] ADD [PaymentId] bigint NULL;
-    END
+END
+IF EXISTS (SELECT * FROM sys.tables WHERE name = 'V_Expenses')
+BEGIN
+    IF NOT EXISTS (SELECT * FROM sys.columns WHERE object_id = OBJECT_ID('V_Expenses') AND name = 'ExpenseCategoryId')
+        ALTER TABLE [V_Expenses] ADD [ExpenseCategoryId] bigint NULL;
+    IF NOT EXISTS (SELECT * FROM sys.columns WHERE object_id = OBJECT_ID('V_Expenses') AND name = 'PaymentModeId')
+        ALTER TABLE [V_Expenses] ADD [PaymentModeId] bigint NULL;
 END";
             db.Database.ExecuteSqlRaw(reconcileUdhaarLedgersSql);
 
@@ -407,6 +442,41 @@ BEGIN
     (1, 'Brand', 'Amul', 'AMUL', 'Amul India', 2),
     (1, 'Brand', 'Tata Consumer', 'TATA', 'Tata Products', 3),
     (1, 'Brand', 'Nestle', 'NESTLE', 'Nestle India', 4);
+END
+
+IF NOT EXISTS (SELECT 1 FROM [V_Masters] WHERE [MasterType] = 'PaymentMode')
+BEGIN
+    INSERT INTO [V_Masters] ([TenantId], [MasterType], [MasterName], [MasterCode], [Description], [Priority])
+    VALUES 
+    (1, 'PaymentMode', 'Cash', 'CASH', 'Cash payment', 1),
+    (1, 'PaymentMode', 'UPI', 'UPI', 'UPI / QR Code payment', 2),
+    (1, 'PaymentMode', 'Udhaar', 'UDHAAR', 'Credit / Udhaar Khata', 3),
+    (1, 'PaymentMode', 'Card', 'CARD', 'Credit / Debit Card payment', 4),
+    (1, 'PaymentMode', 'Net Banking', 'NETBANK', 'Direct bank transfer / NEFT / IMPS', 5),
+    (1, 'PaymentMode', 'Cheque', 'CHEQUE', 'Cheque payment', 6);
+END
+
+IF NOT EXISTS (SELECT 1 FROM [V_Masters] WHERE [MasterType] = 'Tax')
+BEGIN
+    INSERT INTO [V_Masters] ([TenantId], [MasterType], [MasterName], [MasterCode], [Description], [Priority])
+    VALUES 
+    (1, 'Tax', 'GST 0%', 'GST0', '0', 1),
+    (1, 'Tax', 'GST 5%', 'GST5', '5', 2),
+    (1, 'Tax', 'GST 12%', 'GST12', '12', 3),
+    (1, 'Tax', 'GST 18%', 'GST18', '18', 4),
+    (1, 'Tax', 'GST 28%', 'GST28', '28', 5);
+END
+
+IF NOT EXISTS (SELECT 1 FROM [V_Masters] WHERE [MasterType] = 'ExpenseCategory')
+BEGIN
+    INSERT INTO [V_Masters] ([TenantId], [MasterType], [MasterName], [MasterCode], [Description], [Priority])
+    VALUES 
+    (1, 'ExpenseCategory', 'Rent', 'RENT', 'Shop & warehouse rent', 1),
+    (1, 'ExpenseCategory', 'Electricity & Utilities', 'UTIL', 'Power, water, utilities', 2),
+    (1, 'ExpenseCategory', 'Salaries & Wages', 'SALARY', 'Staff salary & daily wages', 3),
+    (1, 'ExpenseCategory', 'Transportation & Fuel', 'TRANS', 'Logistics, delivery, fuel', 4),
+    (1, 'ExpenseCategory', 'Maintenance & Repairs', 'MAINT', 'Shop upkeep & repairs', 5),
+    (1, 'ExpenseCategory', 'Miscellaneous', 'MISC', 'Other daily expenses', 6);
 END
 
 -- Clean up any empty or unnamed master records automatically

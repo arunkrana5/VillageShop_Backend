@@ -18,6 +18,14 @@ public class Stock : BaseTenantEntity
 
     public string Unit { get; set; } = "pcs";
 
+    public long? CategoryId { get; set; }
+
+    public long? BrandId { get; set; }
+
+    public long? UnitId { get; set; }
+
+    public long? TaxId { get; set; }
+
     public string? Barcode { get; set; }
 
     public decimal PurchasePrice { get; set; }

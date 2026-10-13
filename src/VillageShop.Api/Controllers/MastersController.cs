@@ -51,7 +51,7 @@ public class MastersController : ControllerBase
     // =========================================
 
     [HttpGet]
-    public async Task<IActionResult> GetMasters([FromQuery] string? masterType, [FromQuery] long? tenantId, [FromQuery] string? tenantCode, [FromQuery] string? search, [FromQuery] bool activeOnly = false)
+    public async Task<IActionResult> GetMasters([FromQuery] string? masterType, [FromQuery] long? tenantId, [FromQuery] string? tenantCode, [FromQuery] string? search, [FromQuery] bool activeOnly = false, [FromQuery] int page = 1, [FromQuery] int pageSize = 0)
     {
         long tId = ResolveTenantId(tenantId, tenantCode);
         var query = _context.Masters.IgnoreQueryFilters().AsNoTracking().Where(m => m.TenantId == tId && !m.IsDeleted);
@@ -67,6 +67,15 @@ public class MastersController : ControllerBase
         {
             var s = search.ToLower();
             query = query.Where(m => m.MasterName.ToLower().Contains(s) || (m.MasterCode != null && m.MasterCode.ToLower().Contains(s)) || (m.Description != null && m.Description.ToLower().Contains(s)));
+        }
+
+        int totalCount = await query.CountAsync();
+        if (pageSize > 0)
+        {
+            Response.Headers["X-Total-Count"] = totalCount.ToString();
+            Response.Headers["X-Page-Number"] = page.ToString();
+            Response.Headers["X-Page-Size"] = pageSize.ToString();
+            query = query.Skip((page - 1) * pageSize).Take(pageSize);
         }
 
         var list = await query.OrderBy(m => m.MasterType).ThenBy(m => m.Priority).ThenBy(m => m.MasterName)
@@ -218,6 +227,9 @@ public class MastersController : ControllerBase
         var uoms = masters.Where(m => m.masterType.Equals("UnitOfMeasurement", StringComparison.OrdinalIgnoreCase)).ToList();
         var itemTypes = masters.Where(m => m.masterType.Equals("ItemType", StringComparison.OrdinalIgnoreCase)).ToList();
         var brands = masters.Where(m => m.masterType.Equals("Brand", StringComparison.OrdinalIgnoreCase)).ToList();
+        var paymentModes = masters.Where(m => m.masterType.Equals("PaymentMode", StringComparison.OrdinalIgnoreCase)).ToList();
+        var taxes = masters.Where(m => m.masterType.Equals("Tax", StringComparison.OrdinalIgnoreCase)).ToList();
+        var expenseCategories = masters.Where(m => m.masterType.Equals("ExpenseCategory", StringComparison.OrdinalIgnoreCase)).ToList();
 
         return Ok(new
         {
@@ -225,6 +237,9 @@ public class MastersController : ControllerBase
             uoms = uoms,
             itemTypes = itemTypes,
             brands = brands,
+            paymentModes = paymentModes,
+            taxes = taxes,
+            expenseCategories = expenseCategories,
             allMasters = masters
         });
     }
@@ -328,6 +343,60 @@ public class MastersController : ControllerBase
 
     [HttpDelete("brands/{id}")]
     public Task<IActionResult> DeleteBrand(long id) => DeleteMaster(id);
+
+    [HttpGet("payment-modes")]
+    public Task<IActionResult> GetPaymentModes([FromQuery] long? tenantId, [FromQuery] string? tenantCode, [FromQuery] string? search, [FromQuery] bool activeOnly = false)
+        => GetMasters("PaymentMode", tenantId, tenantCode, search, activeOnly);
+
+    [HttpPost("payment-modes")]
+    public Task<IActionResult> CreatePaymentMode([FromBody] GenericMasterRequest req)
+    {
+        req.MasterType = "PaymentMode";
+        return CreateMaster(req);
+    }
+
+    [HttpPut("payment-modes/{id}")]
+    public Task<IActionResult> UpdatePaymentMode(long id, [FromBody] GenericMasterRequest req)
+    {
+        req.MasterType = "PaymentMode";
+        return UpdateMaster(id, req);
+    }
+
+    [HttpGet("taxes")]
+    public Task<IActionResult> GetTaxes([FromQuery] long? tenantId, [FromQuery] string? tenantCode, [FromQuery] string? search, [FromQuery] bool activeOnly = false)
+        => GetMasters("Tax", tenantId, tenantCode, search, activeOnly);
+
+    [HttpPost("taxes")]
+    public Task<IActionResult> CreateTax([FromBody] GenericMasterRequest req)
+    {
+        req.MasterType = "Tax";
+        return CreateMaster(req);
+    }
+
+    [HttpPut("taxes/{id}")]
+    public Task<IActionResult> UpdateTax(long id, [FromBody] GenericMasterRequest req)
+    {
+        req.MasterType = "Tax";
+        return UpdateMaster(id, req);
+    }
+
+    [HttpGet("expense-categories")]
+    public Task<IActionResult> GetExpenseCategories([FromQuery] long? tenantId, [FromQuery] string? tenantCode, [FromQuery] string? search, [FromQuery] bool activeOnly = false)
+        => GetMasters("ExpenseCategory", tenantId, tenantCode, search, activeOnly);
+
+    [HttpPost("expense-categories")]
+    public Task<IActionResult> CreateExpenseCategory([FromBody] GenericMasterRequest req)
+    {
+        req.MasterType = "ExpenseCategory";
+        return CreateMaster(req);
+    }
+
+    [HttpPut("expense-categories/{id}")]
+    public Task<IActionResult> UpdateExpenseCategory(long id, [FromBody] GenericMasterRequest req)
+    {
+        req.MasterType = "ExpenseCategory";
+        return UpdateMaster(id, req);
+    }
 }
 
 public class GenericMasterRequest

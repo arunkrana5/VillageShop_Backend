@@ -8,8 +8,12 @@ public class CreateItemRequest
     public string Name { get; set; } = string.Empty;
     public string ItemName { get; set; } = string.Empty;
     public string? Category { get; set; }
+    public long? CategoryId { get; set; }
     public string Unit { get; set; } = "pcs";
+    public long? UnitId { get; set; }
     public string Format { get; set; } = "Packed";
+    public long? ItemTypeId { get; set; }
+    public long? BrandId { get; set; }
     public string? Description { get; set; }
 }
 
@@ -22,8 +26,12 @@ public class UpdateItemRequest
     public string Name { get; set; } = string.Empty;
     public string ItemName { get; set; } = string.Empty;
     public string? Category { get; set; }
+    public long? CategoryId { get; set; }
     public string Unit { get; set; } = "pcs";
+    public long? UnitId { get; set; }
     public string Format { get; set; } = "Packed";
+    public long? ItemTypeId { get; set; }
+    public long? BrandId { get; set; }
     public string? Description { get; set; }
 }
 
