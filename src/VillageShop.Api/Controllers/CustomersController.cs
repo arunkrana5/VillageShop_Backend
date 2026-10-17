@@ -166,18 +166,19 @@ public class CustomersController : ControllerBase
     [HttpGet("{identifier}/ledger")]
     public async Task<IActionResult> GetCustomerLedger(string identifier)
     {
+        string decodedId = Uri.UnescapeDataString(identifier).Trim();
         Customer? customer = null;
-        if (long.TryParse(identifier, out long id))
+        if (long.TryParse(decodedId, out long id))
         {
             customer = await _context.Customers.IgnoreQueryFilters().FirstOrDefaultAsync(c => c.ID == id && !c.IsDeleted);
         }
         if (customer == null)
         {
-            customer = await _context.Customers.IgnoreQueryFilters().FirstOrDefaultAsync(c => c.Name.ToLower() == identifier.ToLower() && !c.IsDeleted);
+            customer = await _context.Customers.IgnoreQueryFilters().FirstOrDefaultAsync(c => c.Name.ToLower() == decodedId.ToLower() && !c.IsDeleted);
         }
         if (customer == null)
         {
-            customer = await _context.Customers.IgnoreQueryFilters().FirstOrDefaultAsync(c => c.Mobile == identifier && !c.IsDeleted);
+            customer = await _context.Customers.IgnoreQueryFilters().FirstOrDefaultAsync(c => c.Mobile == decodedId && !c.IsDeleted);
         }
 
         if (customer == null)
@@ -196,79 +197,115 @@ public class CustomersController : ControllerBase
             .IgnoreQueryFilters()
             .AsNoTracking()
             .Include(s => s.SalePayments)
+            .Include(s => s.SaleItems)
             .Where(s => s.CustomerId == customer.ID && !s.IsDeleted)
+            .OrderBy(s => s.SaleDate)
             .ToListAsync();
 
         var salesDict = customerSales.ToDictionary(s => s.ID);
+        var linkedSaleIds = ledgers.Where(l => l.SaleId.HasValue).Select(l => l.SaleId!.Value).ToHashSet();
 
         var resultList = new List<object>();
 
-        if (ledgers.Any())
+        // 1. Process all existing ledger records
+        foreach (var l in ledgers)
         {
-            foreach (var l in ledgers)
+            Sale? linkedSale = l.SaleId.HasValue && salesDict.ContainsKey(l.SaleId.Value) ? salesDict[l.SaleId.Value] : null;
+
+            double totalAmount = (double)(linkedSale?.TotalAmount ?? (l.DebitAmount > 0 ? l.DebitAmount : 0));
+            double paidAmount = (double)(linkedSale?.PaidAmount ?? l.CreditAmount);
+            double cashAmount = (double)(linkedSale?.SalePayments?.Where(p => p.PaymentMode.Equals("Cash", StringComparison.OrdinalIgnoreCase) && p.IsReceived).Sum(p => p.Amount) ?? 0);
+            double upiAmount = (double)(linkedSale?.SalePayments?.Where(p => p.PaymentMode.Equals("UPI", StringComparison.OrdinalIgnoreCase) && p.IsReceived).Sum(p => p.Amount) ?? 0);
+            double udhaarAmount = (double)(linkedSale?.UdhaarAmount ?? (l.DebitAmount > l.CreditAmount ? l.DebitAmount - l.CreditAmount : 0));
+            string invoiceNo = linkedSale?.InvoiceNumber ?? "";
+            string paymentMode = linkedSale?.PaymentMode ?? (l.DebitAmount > 0 ? (udhaarAmount > 0 ? "Udhaar" : "Cash") : "Payment Received");
+
+            string itemsSummary = "";
+            if (linkedSale?.SaleItems != null && linkedSale.SaleItems.Any())
             {
-                Sale? linkedSale = l.SaleId.HasValue && salesDict.ContainsKey(l.SaleId.Value) ? salesDict[l.SaleId.Value] : null;
-
-                double totalAmount = (double)(linkedSale?.TotalAmount ?? (l.DebitAmount > 0 ? l.DebitAmount : 0));
-                double paidAmount = (double)(linkedSale?.PaidAmount ?? l.CreditAmount);
-                double cashAmount = (double)(linkedSale?.SalePayments?.Where(p => p.PaymentMode.Equals("Cash", StringComparison.OrdinalIgnoreCase) && p.IsReceived).Sum(p => p.Amount) ?? 0);
-                double upiAmount = (double)(linkedSale?.SalePayments?.Where(p => p.PaymentMode.Equals("UPI", StringComparison.OrdinalIgnoreCase) && p.IsReceived).Sum(p => p.Amount) ?? 0);
-                string invoiceNo = linkedSale?.InvoiceNumber ?? "";
-                string paymentMode = linkedSale?.PaymentMode ?? (l.DebitAmount > 0 ? "Udhaar" : "Payment Received");
-
-                resultList.Add(new
-                {
-                    id = l.ID.ToString(),
-                    date = l.TransactionDate.ToString("dd MMM yyyy, hh:mm tt"),
-                    rawDate = l.TransactionDate,
-                    type = l.TransactionType,
-                    invoiceNumber = invoiceNo,
-                    paymentMode = paymentMode,
-                    description = l.Description ?? (l.DebitAmount > 0 ? "Debit Sale" : "Payment Credit"),
-                    totalAmount = totalAmount,
-                    paidAmount = paidAmount,
-                    cashAmount = cashAmount,
-                    upiAmount = upiAmount,
-                    debit = (double)l.DebitAmount,
-                    credit = (double)l.CreditAmount,
-                    balance = (double)l.RunningBalance
-                });
+                itemsSummary = string.Join(", ", linkedSale.SaleItems.Take(4).Select(i => $"{i.Quantity}x {i.ProductName}"));
+                if (linkedSale.SaleItems.Count > 4) itemsSummary += $", +{linkedSale.SaleItems.Count - 4} more";
             }
+
+            // Standardize Debit and Credit:
+            // For a sale: Debit = Total Bill Amount, Credit = Paid on the spot
+            // For a standalone payment: Debit = 0, Credit = Paid Amount
+            double debitVal = l.SaleId.HasValue ? (totalAmount > 0 ? totalAmount : (double)l.DebitAmount) : (double)l.DebitAmount;
+            double creditVal = l.SaleId.HasValue ? (paidAmount > 0 ? paidAmount : (double)l.CreditAmount) : (double)l.CreditAmount;
+
+            string status = udhaarAmount > 0 
+                ? (paidAmount > 0 ? "PARTIAL" : "UDHAAR") 
+                : (l.SaleId.HasValue ? "PAID" : "RECEIVED");
+
+            resultList.Add(new
+            {
+                id = l.ID.ToString(),
+                date = l.TransactionDate.ToString("dd MMM yyyy, hh:mm tt"),
+                rawDate = l.TransactionDate,
+                type = l.TransactionType,
+                invoiceNumber = invoiceNo,
+                paymentMode = paymentMode,
+                description = l.Description ?? (debitVal > 0 ? $"Invoice #{invoiceNo} [{paymentMode}]" : "Payment Credit"),
+                itemsSummary = itemsSummary,
+                totalAmount = totalAmount,
+                paidAmount = paidAmount,
+                cashAmount = cashAmount,
+                upiAmount = upiAmount,
+                udhaarAmount = udhaarAmount,
+                debit = debitVal,
+                credit = creditVal,
+                balance = (double)l.RunningBalance,
+                status = status
+            });
         }
-        else
+
+        // 2. Also incorporate any sales for this customer that were NOT in UdhaarLedgers table
+        foreach (var s in customerSales.Where(s => !linkedSaleIds.Contains(s.ID)))
         {
-            // Fallback: build ledger entries directly from sales and payments if UdhaarLedger table was empty for this customer
-            decimal running = 0;
-            foreach (var s in customerSales.OrderBy(s => s.SaleDate))
+            double cashAmt = (double)s.SalePayments.Where(p => p.PaymentMode.Equals("Cash", StringComparison.OrdinalIgnoreCase) && p.IsReceived).Sum(p => p.Amount);
+            double upiAmt = (double)s.SalePayments.Where(p => p.PaymentMode.Equals("UPI", StringComparison.OrdinalIgnoreCase) && p.IsReceived).Sum(p => p.Amount);
+            string txType = s.UdhaarAmount > 0 ? (s.PaidAmount > 0 ? "PARTIAL_SALE" : "CREDIT_SALE") : "CASH_SALE";
+            string pDesc = $"Invoice #{s.InvoiceNumber} [{s.PaymentMode}] - Total: ₹{s.TotalAmount:F2} (Paid: ₹{s.PaidAmount:F2}, Udhaar: ₹{s.UdhaarAmount:F2})";
+
+            string itemsSummary = "";
+            if (s.SaleItems != null && s.SaleItems.Any())
             {
-                running += s.UdhaarAmount;
-                double cashAmt = (double)s.SalePayments.Where(p => p.PaymentMode.Equals("Cash", StringComparison.OrdinalIgnoreCase) && p.IsReceived).Sum(p => p.Amount);
-                double upiAmt = (double)s.SalePayments.Where(p => p.PaymentMode.Equals("UPI", StringComparison.OrdinalIgnoreCase) && p.IsReceived).Sum(p => p.Amount);
-
-                string txType = s.UdhaarAmount > 0 ? (s.PaidAmount > 0 ? "PARTIAL_SALE" : "CREDIT_SALE") : "SALE";
-                string desc = s.UdhaarAmount > 0 
-                    ? $"Invoice #{s.InvoiceNumber} (Paid: ₹{s.PaidAmount:F2}, Udhaar: ₹{s.UdhaarAmount:F2})"
-                    : $"Invoice #{s.InvoiceNumber} (Full Paid via {s.PaymentMode})";
-
-                resultList.Add(new
-                {
-                    id = $"sale-{s.ID}",
-                    date = s.SaleDate.ToString("dd MMM yyyy, hh:mm tt"),
-                    rawDate = s.SaleDate,
-                    type = txType,
-                    invoiceNumber = s.InvoiceNumber,
-                    paymentMode = s.PaymentMode,
-                    description = desc,
-                    totalAmount = (double)s.TotalAmount,
-                    paidAmount = (double)s.PaidAmount,
-                    cashAmount = cashAmt,
-                    upiAmount = upiAmt,
-                    debit = (double)s.UdhaarAmount,
-                    credit = 0.0,
-                    balance = (double)running
-                });
+                itemsSummary = string.Join(", ", s.SaleItems.Take(4).Select(i => $"{i.Quantity}x {i.ProductName}"));
+                if (s.SaleItems.Count > 4) itemsSummary += $", +{s.SaleItems.Count - 4} more";
             }
+
+            string status = s.UdhaarAmount > 0 ? (s.PaidAmount > 0 ? "PARTIAL" : "UDHAAR") : "PAID";
+
+            resultList.Add(new
+            {
+                id = $"sale-{s.ID}",
+                date = s.SaleDate.ToString("dd MMM yyyy, hh:mm tt"),
+                rawDate = s.SaleDate,
+                type = txType,
+                invoiceNumber = s.InvoiceNumber,
+                paymentMode = s.PaymentMode,
+                description = pDesc,
+                itemsSummary = itemsSummary,
+                totalAmount = (double)s.TotalAmount,
+                paidAmount = (double)s.PaidAmount,
+                cashAmount = cashAmt,
+                upiAmount = upiAmt,
+                udhaarAmount = (double)s.UdhaarAmount,
+                debit = (double)s.TotalAmount,
+                credit = (double)s.PaidAmount,
+                balance = (double)customer.CurrentBalance,
+                status = status
+            });
         }
+
+        // Sort all transactions chronologically
+        resultList = resultList.OrderBy(x => ((dynamic)x).rawDate).ToList();
+
+        // Calculate summary metrics
+        double totalPurchases = (double)customerSales.Sum(s => s.TotalAmount);
+        double totalPaidSales = (double)customerSales.Sum(s => s.PaidAmount);
+        double totalStandalonePayments = (double)ledgers.Where(l => !l.SaleId.HasValue).Sum(l => l.CreditAmount);
+        double totalPaidOverall = totalPaidSales + totalStandalonePayments;
 
         return Ok(new
         {
@@ -277,7 +314,10 @@ public class CustomersController : ControllerBase
                 id = customer.ID.ToString(),
                 name = customer.Name,
                 phone = customer.Mobile ?? "",
-                currentBalance = (double)customer.CurrentBalance
+                currentBalance = (double)customer.CurrentBalance,
+                totalPurchases = totalPurchases,
+                totalPaid = totalPaidOverall,
+                salesCount = customerSales.Count
             },
             transactions = resultList
         });

@@ -263,17 +263,23 @@ public class SaleService : ISaleService
             {
                 targetCustomer.CurrentBalance += udhaarAmount;
             }
+            targetCustomer.ModifiedDate = DateTime.UtcNow;
 
-            string txType = udhaarAmount > 0 ? (paidAmount > 0 ? "PARTIAL_SALE" : "CREDIT_SALE") : "SALE";
+            string txType = udhaarAmount > 0 ? (paidAmount > 0 ? "PARTIAL_SALE" : "CREDIT_SALE") : "CASH_SALE";
+            
+            string itemsSummary = string.Join(", ", saleItems.Take(4).Select(si => $"{si.Quantity}x {si.ProductName}"));
+            if (saleItems.Count > 4) itemsSummary += $", +{saleItems.Count - 4} more";
+            if (string.IsNullOrWhiteSpace(itemsSummary)) itemsSummary = "Items Purchase";
+
             string pDesc;
             if (salePayments.Any())
             {
                 var modes = string.Join(", ", salePayments.Select(p => $"{p.PaymentMode}: ₹{p.Amount:F2}"));
-                pDesc = $"Invoice #{invoiceNumber} - Total: ₹{finalTotalAmount:F2} ({modes})";
+                pDesc = $"Invoice #{invoiceNumber} [{primaryPaymentMode}] - ₹{finalTotalAmount:F2} ({modes}) - {itemsSummary}";
             }
             else
             {
-                pDesc = $"Invoice #{invoiceNumber} - Total: ₹{finalTotalAmount:F2} (Paid: ₹{paidAmount:F2}, Udhaar: ₹{udhaarAmount:F2})";
+                pDesc = $"Invoice #{invoiceNumber} [{primaryPaymentMode}] - ₹{finalTotalAmount:F2} (Paid: ₹{paidAmount:F2}, Udhaar: ₹{udhaarAmount:F2}) - {itemsSummary}";
             }
 
             var udhaarLedger = new UdhaarLedger
@@ -283,8 +289,8 @@ public class SaleService : ISaleService
                 SaleId = sale.ID,
                 TransactionDate = DateTime.UtcNow,
                 TransactionType = txType,
-                DebitAmount = udhaarAmount,
-                CreditAmount = 0,
+                DebitAmount = finalTotalAmount,
+                CreditAmount = paidAmount,
                 RunningBalance = targetCustomer.CurrentBalance,
                 Description = pDesc
             };
