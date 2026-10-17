@@ -1,5 +1,8 @@
 using System;
+using System.Collections.Generic;
 using System.Linq;
+using System.Text.Json;
+using System.Text.Json.Serialization;
 using System.Threading.Tasks;
 using Microsoft.AspNetCore.Authorization;
 using Microsoft.AspNetCore.Mvc;
@@ -137,25 +140,27 @@ public class MastersController : ControllerBase
     [HttpPost]
     public async Task<IActionResult> CreateMaster([FromBody] GenericMasterRequest req)
     {
-        if (req == null || string.IsNullOrWhiteSpace(req.MasterName))
+        var effectiveName = req?.GetEffectiveMasterName();
+        if (req == null || string.IsNullOrWhiteSpace(effectiveName))
             return BadRequest(PostResponse.Error("Master Name is required."));
 
-        string masterType = string.IsNullOrWhiteSpace(req.MasterType) ? "General" : req.MasterType.Trim();
+        string masterType = req.GetEffectiveMasterType();
         long tId = ResolveTenantId(req.TenantId, req.TenantCode);
 
         bool exists = await _context.Masters.IgnoreQueryFilters().AnyAsync(m => m.TenantId == tId 
             && m.MasterType.ToLower() == masterType.ToLower() 
-            && m.MasterName.ToLower() == req.MasterName.Trim().ToLower() 
+            && m.MasterName.ToLower() == effectiveName.ToLower() 
             && !m.IsDeleted);
 
-        if (exists) return BadRequest(PostResponse.Error($"Master record '{req.MasterName}' already exists under type '{masterType}'."));
+        if (exists) return BadRequest(PostResponse.Error($"Master record '{effectiveName}' already exists under type '{masterType}'."));
 
+        var effectiveCode = req.GetEffectiveMasterCode();
         var entity = new Master
         {
             TenantId = tId,
             MasterType = masterType,
-            MasterName = req.MasterName.Trim(),
-            MasterCode = string.IsNullOrWhiteSpace(req.MasterCode) ? $"{masterType.Substring(0, Math.Min(3, masterType.Length)).ToUpper()}-{DateTime.UtcNow:yyyyMMdd}-{Guid.NewGuid().ToString()[..4].ToUpper()}" : req.MasterCode.Trim(),
+            MasterName = effectiveName,
+            MasterCode = string.IsNullOrWhiteSpace(effectiveCode) ? $"{masterType.Substring(0, Math.Min(3, masterType.Length)).ToUpper()}-{DateTime.UtcNow:yyyyMMdd}-{Guid.NewGuid().ToString()[..4].ToUpper()}" : effectiveCode,
             Description = req.Description,
             Priority = req.Priority ?? 0,
             IsActive = true,
@@ -174,9 +179,15 @@ public class MastersController : ControllerBase
         var entity = await _context.Masters.IgnoreQueryFilters().FirstOrDefaultAsync(m => m.ID == id && !m.IsDeleted);
         if (entity == null) return NotFound(PostResponse.Error("Master record not found.", 404));
 
-        if (!string.IsNullOrWhiteSpace(req?.MasterType)) entity.MasterType = req.MasterType.Trim();
-        if (!string.IsNullOrWhiteSpace(req?.MasterName)) entity.MasterName = req.MasterName.Trim();
-        if (req?.MasterCode != null) entity.MasterCode = req.MasterCode.Trim();
+        var mType = req?.GetEffectiveMasterType();
+        if (!string.IsNullOrWhiteSpace(mType) && mType != "General") entity.MasterType = mType;
+
+        var mName = req?.GetEffectiveMasterName();
+        if (!string.IsNullOrWhiteSpace(mName)) entity.MasterName = mName;
+
+        var mCode = req?.GetEffectiveMasterCode();
+        if (mCode != null) entity.MasterCode = mCode;
+
         if (req?.Description != null) entity.Description = req.Description;
         if (req?.Priority.HasValue == true) entity.Priority = req.Priority.Value;
 
@@ -411,52 +422,80 @@ public class GenericMasterRequest
     public long? TenantId { get; set; }
     public string? TenantCode { get; set; }
 
-    private string? _masterType;
-    public string? MasterType 
-    { 
-        get => _masterType ?? masterType; 
-        set => _masterType = value; 
-    }
-    public string? masterType { get; set; }
-
-    private string? _masterName;
-    public string? MasterName 
-    { 
-        get => _masterName ?? masterName ?? name ?? Name ?? categoryName ?? CategoryName ?? uomName ?? UOMName ?? itemTypeName ?? ItemTypeName ?? brandName ?? BrandName; 
-        set => _masterName = value; 
-    }
-    public string? masterName { get; set; }
-    public string? name { get; set; }
-    public string? Name { get; set; }
-    public string? categoryName { get; set; }
-    public string? CategoryName { get; set; }
-    public string? uomName { get; set; }
-    public string? UOMName { get; set; }
-    public string? itemTypeName { get; set; }
-    public string? ItemTypeName { get; set; }
-    public string? brandName { get; set; }
-    public string? BrandName { get; set; }
-
-    private string? _masterCode;
-    public string? MasterCode 
-    { 
-        get => _masterCode ?? masterCode ?? code ?? Code ?? symbol ?? Symbol ?? categoryCode ?? CategoryCode ?? uomCode ?? UOMCode ?? itemTypeCode ?? ItemTypeCode ?? brandCode ?? BrandCode; 
-        set => _masterCode = value; 
-    }
-    public string? masterCode { get; set; }
-    public string? code { get; set; }
-    public string? Code { get; set; }
-    public string? symbol { get; set; }
-    public string? Symbol { get; set; }
-    public string? categoryCode { get; set; }
-    public string? CategoryCode { get; set; }
-    public string? uomCode { get; set; }
-    public string? UOMCode { get; set; }
-    public string? itemTypeCode { get; set; }
-    public string? ItemTypeCode { get; set; }
-    public string? brandCode { get; set; }
-    public string? BrandCode { get; set; }
-
+    public string? MasterType { get; set; }
+    public string? MasterName { get; set; }
+    public string? MasterCode { get; set; }
     public string? Description { get; set; }
     public int? Priority { get; set; }
+
+    [JsonExtensionData]
+    public Dictionary<string, JsonElement> ExtensionData { get; set; } = new(StringComparer.OrdinalIgnoreCase);
+
+    public string GetEffectiveMasterType()
+    {
+        if (!string.IsNullOrWhiteSpace(MasterType)) return MasterType.Trim();
+        if (ExtensionData != null)
+        {
+            foreach (var kvp in ExtensionData)
+            {
+                var k = kvp.Key.ToLower();
+                if (k == "mastertype" || k == "type")
+                {
+                    if (kvp.Value.ValueKind == JsonValueKind.String)
+                    {
+                        var s = kvp.Value.GetString();
+                        if (!string.IsNullOrWhiteSpace(s)) return s.Trim();
+                    }
+                }
+            }
+        }
+        return "General";
+    }
+
+    public string? GetEffectiveMasterName()
+    {
+        if (!string.IsNullOrWhiteSpace(MasterName)) return MasterName.Trim();
+        if (ExtensionData != null)
+        {
+            foreach (var kvp in ExtensionData)
+            {
+                var k = kvp.Key.ToLower();
+                if (k == "mastername" || k == "name" || k == "categoryname" || k == "uomname" || 
+                    k == "itemtypename" || k == "brandname" || k == "paymentmodename" || 
+                    k == "taxname" || k == "expensecategoryname" || k == "expensename" || 
+                    k == "title" || k == "label")
+                {
+                    if (kvp.Value.ValueKind == JsonValueKind.String)
+                    {
+                        var s = kvp.Value.GetString();
+                        if (!string.IsNullOrWhiteSpace(s)) return s.Trim();
+                    }
+                }
+            }
+        }
+        return null;
+    }
+
+    public string? GetEffectiveMasterCode()
+    {
+        if (!string.IsNullOrWhiteSpace(MasterCode)) return MasterCode.Trim();
+        if (ExtensionData != null)
+        {
+            foreach (var kvp in ExtensionData)
+            {
+                var k = kvp.Key.ToLower();
+                if (k == "mastercode" || k == "code" || k == "symbol" || 
+                    k == "categorycode" || k == "uomcode" || k == "itemtypecode" || 
+                    k == "brandcode" || k == "shortname")
+                {
+                    if (kvp.Value.ValueKind == JsonValueKind.String)
+                    {
+                        var s = kvp.Value.GetString();
+                        if (!string.IsNullOrWhiteSpace(s)) return s.Trim();
+                    }
+                }
+            }
+        }
+        return null;
+    }
 }
