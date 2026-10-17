@@ -90,8 +90,11 @@ public class SalesController : ControllerBase
                         productName = si.ProductName,
                         quantity = (double)si.Quantity,
                         unitPrice = (double)si.UnitPrice,
+                        rate = (double)si.UnitPrice,
+                        price = (double)si.UnitPrice,
                         taxPercent = (double)si.TaxPercent,
-                        totalAmount = (double)si.TotalAmount
+                        totalAmount = (double)si.TotalAmount,
+                        total = (double)si.TotalAmount
                     }).ToList(),
                     payments = s.SalePayments.Select(sp => new
                     {
@@ -154,8 +157,11 @@ public class SalesController : ControllerBase
                             productName = si.ProductName,
                             quantity = (double)si.Quantity,
                             unitPrice = (double)si.UnitPrice,
+                            rate = (double)si.UnitPrice,
+                            price = (double)si.UnitPrice,
                             taxPercent = (double)si.TaxPercent,
-                            totalAmount = (double)si.TotalAmount
+                            totalAmount = (double)si.TotalAmount,
+                            total = (double)si.TotalAmount
                         }).ToList(),
                         payments = new System.Collections.Generic.List<object>()
                     })

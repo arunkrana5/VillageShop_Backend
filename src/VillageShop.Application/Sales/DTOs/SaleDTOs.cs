@@ -51,6 +51,11 @@ public class CreateSaleItemRequest
         get => _unitPrice;
         set => _unitPrice = value > 0 ? value : _unitPrice;
     }
+    public decimal Rate
+    {
+        get => _unitPrice;
+        set => _unitPrice = value > 0 ? value : _unitPrice;
+    }
 
     public decimal TaxPercent { get; set; }
     public long? TaxId { get; set; }
