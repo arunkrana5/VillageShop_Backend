@@ -166,19 +166,55 @@ public class CustomersController : ControllerBase
     [HttpGet("{identifier}/ledger")]
     public async Task<IActionResult> GetCustomerLedger(string identifier)
     {
+        long targetTenantId = 0;
+        if (Request.Headers.TryGetValue("X-Tenant-Id", out var headerTidStr) && long.TryParse(headerTidStr, out var headerTid) && headerTid > 0)
+        {
+            targetTenantId = headerTid;
+        }
+        if (targetTenantId <= 0 && Request.Headers.TryGetValue("X-Tenant-Code", out var headerTCode) && !string.IsNullOrWhiteSpace(headerTCode))
+        {
+            var tenant = await _context.Tenants.IgnoreQueryFilters().FirstOrDefaultAsync(t => t.TenantCode.ToLower() == headerTCode.ToString().ToLower() && !t.IsDeleted);
+            if (tenant != null) targetTenantId = tenant.ID;
+        }
+        if (targetTenantId <= 0 && Request.Query.TryGetValue("tenantId", out var qTidStr) && long.TryParse(qTidStr, out var qTid) && qTid > 0)
+        {
+            targetTenantId = qTid;
+        }
+
         string decodedId = Uri.UnescapeDataString(identifier).Trim();
         Customer? customer = null;
-        if (long.TryParse(decodedId, out long id))
+        if (long.TryParse(decodedId, out long id) && id > 0)
         {
-            customer = await _context.Customers.IgnoreQueryFilters().FirstOrDefaultAsync(c => c.ID == id && !c.IsDeleted);
+            if (targetTenantId > 0)
+            {
+                customer = await _context.Customers.IgnoreQueryFilters().FirstOrDefaultAsync(c => c.ID == id && c.TenantId == targetTenantId && !c.IsDeleted);
+            }
+            if (customer == null)
+            {
+                customer = await _context.Customers.IgnoreQueryFilters().FirstOrDefaultAsync(c => c.ID == id && !c.IsDeleted);
+            }
         }
-        if (customer == null)
+        if (customer == null && !string.IsNullOrWhiteSpace(decodedId))
         {
-            customer = await _context.Customers.IgnoreQueryFilters().FirstOrDefaultAsync(c => c.Name.ToLower() == decodedId.ToLower() && !c.IsDeleted);
+            if (targetTenantId > 0)
+            {
+                customer = await _context.Customers.IgnoreQueryFilters().FirstOrDefaultAsync(c => c.TenantId == targetTenantId && c.Name.ToLower() == decodedId.ToLower() && !c.IsDeleted);
+            }
+            if (customer == null)
+            {
+                customer = await _context.Customers.IgnoreQueryFilters().FirstOrDefaultAsync(c => c.Name.ToLower() == decodedId.ToLower() && !c.IsDeleted);
+            }
         }
-        if (customer == null)
+        if (customer == null && !string.IsNullOrWhiteSpace(decodedId))
         {
-            customer = await _context.Customers.IgnoreQueryFilters().FirstOrDefaultAsync(c => c.Mobile == decodedId && !c.IsDeleted);
+            if (targetTenantId > 0)
+            {
+                customer = await _context.Customers.IgnoreQueryFilters().FirstOrDefaultAsync(c => c.TenantId == targetTenantId && c.Mobile == decodedId && !c.IsDeleted);
+            }
+            if (customer == null)
+            {
+                customer = await _context.Customers.IgnoreQueryFilters().FirstOrDefaultAsync(c => c.Mobile == decodedId && !c.IsDeleted);
+            }
         }
 
         if (customer == null)
@@ -326,14 +362,39 @@ public class CustomersController : ControllerBase
     [HttpPost("payment")]
     public async Task<IActionResult> RecordPayment([FromBody] CustomerPaymentRequest request)
     {
+        long targetTenantId = request.TenantId ?? 0;
+        if (targetTenantId <= 0 && !string.IsNullOrWhiteSpace(request.TenantCode))
+        {
+            var tenant = await _context.Tenants.IgnoreQueryFilters().FirstOrDefaultAsync(t => t.TenantCode.ToLower() == request.TenantCode.ToLower() && !t.IsDeleted);
+            if (tenant != null) targetTenantId = tenant.ID;
+        }
+        if (targetTenantId <= 0 && Request.Headers.TryGetValue("X-Tenant-Id", out var headerTidStr) && long.TryParse(headerTidStr, out var headerTid) && headerTid > 0)
+        {
+            targetTenantId = headerTid;
+        }
+
         Customer? customer = null;
         if (request.CustomerId.HasValue && request.CustomerId.Value > 0)
         {
-            customer = await _context.Customers.IgnoreQueryFilters().FirstOrDefaultAsync(c => c.ID == request.CustomerId.Value && !c.IsDeleted);
+            if (targetTenantId > 0)
+            {
+                customer = await _context.Customers.IgnoreQueryFilters().FirstOrDefaultAsync(c => c.ID == request.CustomerId.Value && c.TenantId == targetTenantId && !c.IsDeleted);
+            }
+            if (customer == null)
+            {
+                customer = await _context.Customers.IgnoreQueryFilters().FirstOrDefaultAsync(c => c.ID == request.CustomerId.Value && !c.IsDeleted);
+            }
         }
         if (customer == null && !string.IsNullOrWhiteSpace(request.CustomerName))
         {
-            customer = await _context.Customers.IgnoreQueryFilters().FirstOrDefaultAsync(c => c.Name.ToLower() == request.CustomerName.ToLower() && !c.IsDeleted);
+            if (targetTenantId > 0)
+            {
+                customer = await _context.Customers.IgnoreQueryFilters().FirstOrDefaultAsync(c => c.TenantId == targetTenantId && c.Name.ToLower() == request.CustomerName.ToLower() && !c.IsDeleted);
+            }
+            if (customer == null)
+            {
+                customer = await _context.Customers.IgnoreQueryFilters().FirstOrDefaultAsync(c => c.Name.ToLower() == request.CustomerName.ToLower() && !c.IsDeleted);
+            }
         }
 
         if (customer != null)
@@ -404,6 +465,8 @@ public class CustomerCreateRequest
 
 public class CustomerPaymentRequest
 {
+    public long? TenantId { get; set; }
+    public string? TenantCode { get; set; }
     public long? CustomerId { get; set; }
     public string CustomerName { get; set; } = string.Empty;
     public double AmountPaid { get; set; }

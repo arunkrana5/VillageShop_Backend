@@ -52,23 +52,7 @@ public class SaleService : ISaleService
             if (tenant != null) targetTenantId = tenant.ID;
         }
 
-        // 3. Resolve Customer by ID or Name
-        Customer? targetCustomer = null;
-        if (request.CustomerId.HasValue && request.CustomerId.Value > 0)
-        {
-            targetCustomer = await _context.Customers.IgnoreQueryFilters().FirstOrDefaultAsync(c => c.ID == request.CustomerId.Value && !c.IsDeleted);
-        }
-        if (targetCustomer == null && !string.IsNullOrWhiteSpace(request.CustomerName) && request.CustomerName.ToLower() != "walk-in customer")
-        {
-            targetCustomer = await _context.Customers.IgnoreQueryFilters().FirstOrDefaultAsync(c => c.Name.ToLower() == request.CustomerName.ToLower() && !c.IsDeleted);
-        }
-
-        if ((targetTenantId <= 0 || targetTenantId == 1) && targetCustomer != null && targetCustomer.TenantId > 0)
-        {
-            targetTenantId = targetCustomer.TenantId;
-        }
-
-        if (targetTenantId <= 0 || targetTenantId == 1)
+        if (targetTenantId <= 0)
         {
             var firstItem = request.Items.FirstOrDefault();
             if (firstItem != null)
@@ -84,7 +68,33 @@ public class SaleService : ISaleService
 
         if (targetTenantId <= 0) targetTenantId = 1;
 
-        if (targetCustomer == null && !string.IsNullOrWhiteSpace(request.CustomerName) && request.CustomerName.ToLower() != "walk-in customer")
+        // 3. Resolve Customer by ID or Name (Strictly scoped to targetTenantId)
+        Customer? targetCustomer = null;
+        if (request.CustomerId.HasValue && request.CustomerId.Value > 0)
+        {
+            if (targetTenantId > 0)
+            {
+                targetCustomer = await _context.Customers.IgnoreQueryFilters().FirstOrDefaultAsync(c => c.ID == request.CustomerId.Value && c.TenantId == targetTenantId && !c.IsDeleted);
+            }
+            if (targetCustomer == null)
+            {
+                targetCustomer = await _context.Customers.IgnoreQueryFilters().FirstOrDefaultAsync(c => c.ID == request.CustomerId.Value && !c.IsDeleted);
+            }
+        }
+
+        if (targetCustomer == null && !string.IsNullOrWhiteSpace(request.CustomerName) && !request.CustomerName.Equals("Walk-in Customer", StringComparison.OrdinalIgnoreCase))
+        {
+            if (targetTenantId > 0)
+            {
+                targetCustomer = await _context.Customers.IgnoreQueryFilters().FirstOrDefaultAsync(c => c.TenantId == targetTenantId && c.Name.ToLower() == request.CustomerName.ToLower() && !c.IsDeleted);
+            }
+            if (targetCustomer == null)
+            {
+                targetCustomer = await _context.Customers.IgnoreQueryFilters().FirstOrDefaultAsync(c => c.Name.ToLower() == request.CustomerName.ToLower() && !c.IsDeleted);
+            }
+        }
+
+        if (targetCustomer == null && !string.IsNullOrWhiteSpace(request.CustomerName) && !request.CustomerName.Equals("Walk-in Customer", StringComparison.OrdinalIgnoreCase))
         {
             targetCustomer = new Customer
             {
