@@ -127,9 +127,14 @@ public class MastersController : ControllerBase
     public async Task<IActionResult> GetMasterTypes([FromQuery] long? tenantId, [FromQuery] string? tenantCode)
     {
         long tId = ResolveTenantId(tenantId, tenantCode);
-        var types = await _context.Masters.IgnoreQueryFilters().AsNoTracking()
-            .Where(m => m.TenantId == tId && !m.IsDeleted)
-            .Select(m => m.MasterType)
+        var baseQuery = _context.Masters.IgnoreQueryFilters().AsNoTracking().Where(m => m.TenantId == tId && !m.IsDeleted && !string.IsNullOrWhiteSpace(m.MasterType));
+        if (tId != 1 && !await baseQuery.AnyAsync())
+        {
+            baseQuery = _context.Masters.IgnoreQueryFilters().AsNoTracking().Where(m => m.TenantId == 1 && !m.IsDeleted && !string.IsNullOrWhiteSpace(m.MasterType));
+        }
+
+        var types = await baseQuery
+            .Select(m => m.MasterType.Trim())
             .Distinct()
             .OrderBy(t => t)
             .ToListAsync();
