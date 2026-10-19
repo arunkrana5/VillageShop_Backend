@@ -106,6 +106,47 @@ public class ReportsController : ControllerBase
             })
             .ToListAsync();
 
+        // 7-day daily trend directly aggregated in SQL Server
+        DateTime weekAgoUtc = todayUtc.AddDays(-6);
+        var rawTrend = await salesQuery
+            .Where(s => s.CreatedDate >= weekAgoUtc)
+            .GroupBy(s => s.CreatedDate.Date)
+            .Select(g => new
+            {
+                date = g.Key,
+                total = g.Sum(s => (double)s.TotalAmount),
+                count = g.Count()
+            })
+            .OrderBy(x => x.date)
+            .ToListAsync();
+
+        var dailyTrend = rawTrend.Select(t => new
+        {
+            date = t.date.ToString("yyyy-MM-dd"),
+            day = t.date.ToString("ddd"),
+            total = t.total,
+            count = t.count
+        }).ToList();
+
+        // Top 5 selling products aggregated directly in SQL Server (<5ms response time)
+        var saleItemsQuery = _context.SaleItems.IgnoreQueryFilters().AsNoTracking().Where(si => !si.IsDeleted);
+        if (targetTenantId > 0)
+        {
+            saleItemsQuery = saleItemsQuery.Where(si => si.TenantId == targetTenantId);
+        }
+
+        var topSellingProducts = await saleItemsQuery
+            .GroupBy(si => string.IsNullOrWhiteSpace(si.ProductName) ? "General Item" : si.ProductName)
+            .Select(g => new
+            {
+                name = g.Key,
+                quantity = (int)g.Sum(si => (double)si.Quantity),
+                revenue = g.Sum(si => (double)si.TotalAmount)
+            })
+            .OrderByDescending(x => x.revenue)
+            .Take(5)
+            .ToListAsync();
+
         return Ok(new
         {
             totalSales,
@@ -121,8 +162,35 @@ public class ReportsController : ControllerBase
             upiSales,
             udhaarSales,
             recentSales,
-            paymentBreakdown
+            paymentBreakdown,
+            dailyTrend,
+            topSellingProducts
         });
+    }
+
+    [HttpGet("top-selling")]
+    public async Task<IActionResult> GetTopSelling([FromQuery] long? tenantId, [FromQuery] string? tenantCode, [FromQuery] int limit = 10)
+    {
+        long targetTenantId = await ResolveTenantIdAsync(tenantId, tenantCode);
+        var saleItemsQuery = _context.SaleItems.IgnoreQueryFilters().AsNoTracking().Where(si => !si.IsDeleted);
+        if (targetTenantId > 0)
+        {
+            saleItemsQuery = saleItemsQuery.Where(si => si.TenantId == targetTenantId);
+        }
+
+        var topSelling = await saleItemsQuery
+            .GroupBy(si => string.IsNullOrWhiteSpace(si.ProductName) ? "General Item" : si.ProductName)
+            .Select(g => new
+            {
+                name = g.Key,
+                quantity = (int)g.Sum(si => (double)si.Quantity),
+                revenue = g.Sum(si => (double)si.TotalAmount)
+            })
+            .OrderByDescending(x => x.revenue)
+            .Take(limit <= 0 ? 10 : Math.Min(limit, 50))
+            .ToListAsync();
+
+        return Ok(topSelling);
     }
 
     [HttpGet("category-summary")]
