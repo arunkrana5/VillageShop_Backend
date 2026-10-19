@@ -64,7 +64,7 @@ public class StockController : ControllerBase
     }
 
     [HttpGet]
-    public async Task<ActionResult<IEnumerable<Stock>>> Search([FromQuery] StockInSearchRequest request)
+    public async Task<IActionResult> Search([FromQuery] StockInSearchRequest request)
     {
         if (request == null) request = new StockInSearchRequest();
         if ((!request.TenantId.HasValue || request.TenantId <= 0) && Request.Headers.TryGetValue("X-Tenant-Id", out var headerTidStr) && long.TryParse(headerTidStr, out var headerTid) && headerTid > 0)
@@ -77,7 +77,19 @@ public class StockController : ControllerBase
             request.TenantCode = headerTCode;
         }
 
+        bool isPaged = request.Paged || Request.Query.ContainsKey("paged") || (Request.Query.ContainsKey("page") && Request.Query.ContainsKey("pageSize"));
+        if (isPaged)
+        {
+            var pagedResult = await _stockService.SearchPagedAsync(request);
+            Response.Headers["X-Total-Count"] = pagedResult.TotalCount.ToString();
+            Response.Headers["X-Page-Number"] = pagedResult.Page.ToString();
+            Response.Headers["X-Page-Size"] = pagedResult.PageSize.ToString();
+            Response.Headers["X-Has-More"] = pagedResult.HasMore.ToString().ToLower();
+            return Ok(pagedResult);
+        }
+
         var products = await _stockService.SearchAsync(request);
         return Ok(products);
     }
 }
+

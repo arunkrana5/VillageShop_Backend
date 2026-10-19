@@ -89,15 +89,19 @@ public class MastersController : ControllerBase
         }
 
         int totalCount = await query.CountAsync();
+        var orderedQuery = query.OrderBy(m => m.MasterType).ThenBy(m => m.Priority).ThenBy(m => m.MasterName).ThenBy(m => m.ID);
+
         if (pageSize > 0)
         {
             Response.Headers["X-Total-Count"] = totalCount.ToString();
             Response.Headers["X-Page-Number"] = page.ToString();
             Response.Headers["X-Page-Size"] = pageSize.ToString();
-            query = query.Skip((page - 1) * pageSize).Take(pageSize);
+            bool hasMore = page * pageSize < totalCount;
+            Response.Headers["X-Has-More"] = hasMore.ToString().ToLower();
+            orderedQuery = (IOrderedQueryable<Master>)orderedQuery.Skip((page - 1) * pageSize).Take(pageSize);
         }
 
-        var list = await query.OrderBy(m => m.MasterType).ThenBy(m => m.Priority).ThenBy(m => m.MasterName)
+        var list = await orderedQuery
             .Select(m => new
             {
                 id = m.ID,
@@ -119,6 +123,12 @@ public class MastersController : ControllerBase
                 ipAddress = m.IPAddress ?? "127.0.0.1"
             })
             .ToListAsync();
+
+        bool isPaged = (Request.Query.ContainsKey("paged") && Request.Query["paged"] == "true") || (Request.Query.ContainsKey("page") && pageSize > 0 && Request.Query.ContainsKey("pageSize"));
+        if (isPaged && pageSize > 0)
+        {
+            return Ok(PagedResult<object>.Create(list.Cast<object>().ToList(), totalCount, page, pageSize));
+        }
 
         return Ok(list);
     }

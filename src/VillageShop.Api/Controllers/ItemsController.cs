@@ -64,7 +64,7 @@ public class ItemsController : ControllerBase
     }
 
     [HttpGet]
-    public async Task<ActionResult<IEnumerable<Item>>> Search([FromQuery] ItemSearchRequest request)
+    public async Task<IActionResult> Search([FromQuery] ItemSearchRequest request)
     {
         if (request == null) request = new ItemSearchRequest();
         if ((!request.TenantId.HasValue || request.TenantId <= 0) && Request.Headers.TryGetValue("X-Tenant-Id", out var headerTidStr) && long.TryParse(headerTidStr, out var headerTid) && headerTid > 0)
@@ -72,7 +72,41 @@ public class ItemsController : ControllerBase
             request.TenantId = headerTid;
         }
 
+        if ((!request.TenantId.HasValue || request.TenantId <= 0) && Request.Headers.TryGetValue("X-Tenant-Code", out var headerTCode) && !string.IsNullOrWhiteSpace(headerTCode))
+        {
+            request.TenantCode = headerTCode;
+        }
+
+        bool isPaged = request.Paged || Request.Query.ContainsKey("paged") || (Request.Query.ContainsKey("page") && Request.Query.ContainsKey("pageSize"));
+        if (isPaged)
+        {
+            var pagedResult = await _itemService.SearchPagedAsync(request);
+            Response.Headers["X-Total-Count"] = pagedResult.TotalCount.ToString();
+            Response.Headers["X-Page-Number"] = pagedResult.Page.ToString();
+            Response.Headers["X-Page-Size"] = pagedResult.PageSize.ToString();
+            Response.Headers["X-Has-More"] = pagedResult.HasMore.ToString().ToLower();
+            return Ok(pagedResult);
+        }
+
         var items = await _itemService.SearchAsync(request);
         return Ok(items);
     }
+
+    [HttpPost("bulk-import")]
+    public async Task<ActionResult<BulkImportResult>> BulkImport([FromBody] BulkImportRequest request)
+    {
+        if (request == null) request = new BulkImportRequest();
+        if ((!request.TenantId.HasValue || request.TenantId <= 0) && Request.Headers.TryGetValue("X-Tenant-Id", out var headerTidStr) && long.TryParse(headerTidStr, out var headerTid) && headerTid > 0)
+        {
+            request.TenantId = headerTid;
+        }
+        if ((!request.TenantId.HasValue || request.TenantId <= 0) && Request.Headers.TryGetValue("X-Tenant-Code", out var headerTCode) && !string.IsNullOrWhiteSpace(headerTCode))
+        {
+            request.TenantCode = headerTCode;
+        }
+
+        var result = await _itemService.BulkImportAsync(request);
+        return Ok(result);
+    }
 }
+

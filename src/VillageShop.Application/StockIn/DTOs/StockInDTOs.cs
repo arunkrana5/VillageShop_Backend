@@ -1,6 +1,8 @@
 using System;
+using VillageShop.Common.Models;
 
 namespace VillageShop.Application.StockIn.DTOs;
+
 
 public class CreateStockInRequest
 {
@@ -57,21 +59,9 @@ public class UpdateStockInRequest : CreateStockInRequest
     public long ID { get; set; }
 }
 
-public class StockInSearchRequest
+public class StockInSearchRequest : PagedRequest
 {
-    public long? TenantId { get; set; }
-
-    public string? TenantCode { get; set; }
-
-    public string Search { get; set; } = string.Empty;
-
     public string Category { get; set; } = string.Empty;
-
-    public int PageNumber { get; set; } = 1;
-
-    public int PageSize { get; set; } = 200;
-
-    public string SortBy { get; set; } = "ID";
-
-    public string SortDirection { get; set; } = "DESC";
+    public bool Paged { get; set; } = false;
 }
+

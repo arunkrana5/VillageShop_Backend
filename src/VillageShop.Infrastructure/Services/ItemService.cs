@@ -149,7 +149,7 @@ public class ItemService : IItemService
         return await _context.Items.FirstOrDefaultAsync(i => i.ID == id && !i.IsDeleted);
     }
 
-    public async Task<IEnumerable<Item>> SearchAsync(ItemSearchRequest request)
+    private async Task<(IQueryable<Item> Query, long TenantId)> BuildSearchQueryAsync(ItemSearchRequest request)
     {
         var query = _context.Items.IgnoreQueryFilters().AsNoTracking().Where(i => !i.IsDeleted);
 
@@ -178,6 +178,203 @@ public class ItemService : IItemService
                                      (i.Category != null && i.Category.ToLower().Contains(term)));
         }
 
-        return await query.OrderByDescending(i => i.ID).ToListAsync();
+        if (!string.IsNullOrWhiteSpace(request.Category))
+        {
+            var cat = request.Category.Trim().ToLower();
+            query = query.Where(i => i.Category != null && i.Category.ToLower() == cat);
+        }
+
+        if (request.CategoryId.HasValue && request.CategoryId.Value > 0)
+        {
+            query = query.Where(i => i.CategoryId == request.CategoryId.Value);
+        }
+
+        return (query, effectiveTenantId);
+    }
+
+    private static IQueryable<Item> ApplySorting(IQueryable<Item> query, string? sortBy, string? sortDirection)
+    {
+        bool isAsc = string.Equals(sortDirection, "asc", StringComparison.OrdinalIgnoreCase);
+        return (sortBy?.Trim().ToLower()) switch
+        {
+            "name" => isAsc ? query.OrderBy(i => i.Name).ThenByDescending(i => i.ID) : query.OrderByDescending(i => i.Name).ThenByDescending(i => i.ID),
+            "itemcode" => isAsc ? query.OrderBy(i => i.ItemCode).ThenByDescending(i => i.ID) : query.OrderByDescending(i => i.ItemCode).ThenByDescending(i => i.ID),
+            "category" => isAsc ? query.OrderBy(i => i.Category).ThenByDescending(i => i.ID) : query.OrderByDescending(i => i.Category).ThenByDescending(i => i.ID),
+            "unit" => isAsc ? query.OrderBy(i => i.Unit).ThenByDescending(i => i.ID) : query.OrderByDescending(i => i.Unit).ThenByDescending(i => i.ID),
+            _ => isAsc ? query.OrderBy(i => i.ID) : query.OrderByDescending(i => i.ID),
+        };
+    }
+
+    public async Task<IEnumerable<Item>> SearchAsync(ItemSearchRequest request)
+    {
+        var (query, _) = await BuildSearchQueryAsync(request);
+        var sortedQuery = ApplySorting(query, request.SortBy, request.SortDirection);
+
+        if (request.PageSize > 0)
+        {
+            int page = request.Page < 1 ? 1 : request.Page;
+            int pageSize = Math.Min(request.PageSize, 200);
+            return await sortedQuery.Skip((page - 1) * pageSize).Take(pageSize).ToListAsync();
+        }
+
+        return await sortedQuery.Take(200).ToListAsync();
+    }
+
+    public async Task<PagedResult<Item>> SearchPagedAsync(ItemSearchRequest request)
+    {
+        var (query, _) = await BuildSearchQueryAsync(request);
+        int totalCount = await query.CountAsync();
+
+        var sortedQuery = ApplySorting(query, request.SortBy, request.SortDirection);
+        int page = request.Page < 1 ? 1 : request.Page;
+        int pageSize = request.PageSize <= 0 ? 25 : Math.Min(request.PageSize, 200);
+
+        var items = await sortedQuery
+            .Skip((page - 1) * pageSize)
+            .Take(pageSize)
+            .ToListAsync();
+
+        return PagedResult<Item>.Create(items, totalCount, page, pageSize);
+    }
+
+    public async Task<BulkImportResult> BulkImportAsync(BulkImportRequest request)
+    {
+        var result = new BulkImportResult
+        {
+            TotalRows = request.Items.Count
+        };
+
+        if (request.Items == null || request.Items.Count == 0)
+        {
+            return result;
+        }
+
+        long effectiveTenantId = request.TenantId ?? 0;
+        if (effectiveTenantId <= 0 && !string.IsNullOrWhiteSpace(request.TenantCode))
+        {
+            var tenant = await _context.Tenants.IgnoreQueryFilters().FirstOrDefaultAsync(t => t.TenantCode.ToLower() == request.TenantCode.ToLower() && !t.IsDeleted);
+            if (tenant != null) effectiveTenantId = tenant.ID;
+        }
+        if (effectiveTenantId <= 0 && _currentTenantService != null && _currentTenantService.TenantId > 0)
+        {
+            effectiveTenantId = _currentTenantService.TenantId;
+        }
+        if (effectiveTenantId <= 0) effectiveTenantId = 1;
+
+        // Process in chunks of 100 to avoid high memory spikes
+        const int batchSize = 100;
+        for (int i = 0; i < request.Items.Count; i += batchSize)
+        {
+            var batch = request.Items.Skip(i).Take(batchSize).ToList();
+            var newItems = new List<Item>();
+            var newStocks = new List<Stock>();
+
+            foreach (var row in batch)
+            {
+                int rowIdx = row.RowIndex > 0 ? row.RowIndex : (i + newItems.Count + 1);
+
+                if (string.IsNullOrWhiteSpace(row.Name))
+                {
+                    result.FailureCount++;
+                    result.Errors.Add(new BulkImportRowError
+                    {
+                        RowIndex = rowIdx,
+                        Field = "Name",
+                        ErrorMessage = "Item Name is required."
+                    });
+                    continue;
+                }
+
+                var itemCode = string.IsNullOrWhiteSpace(row.ItemCode)
+                    ? $"ITM-{Guid.NewGuid().ToString("N")[..8].ToUpper()}"
+                    : row.ItemCode.Trim();
+
+                var item = new Item
+                {
+                    TenantId = effectiveTenantId,
+                    ItemCode = itemCode,
+                    Name = row.Name.Trim(),
+                    Category = string.IsNullOrWhiteSpace(row.Category) ? "General" : row.Category.Trim(),
+                    Unit = string.IsNullOrWhiteSpace(row.Unit) ? "pcs" : row.Unit.Trim(),
+                    Format = string.IsNullOrWhiteSpace(row.Format) ? "Packed" : row.Format.Trim(),
+                    Description = row.Description,
+                    IsActive = true,
+                    IsDeleted = false,
+                    CreatedBy = 1,
+                    EntrySource = "BulkImport",
+                    CreatedDate = DateTime.UtcNow,
+                    ModifiedDate = DateTime.UtcNow
+                };
+
+                newItems.Add(item);
+
+                // If stock or pricing info is provided, create linked stock
+                if (row.PurchasePrice.HasValue || row.SellingPrice.HasValue || row.MRP.HasValue || row.OpeningStock.HasValue || !string.IsNullOrWhiteSpace(row.Barcode))
+                {
+                    newStocks.Add(new Stock
+                    {
+                        TenantId = effectiveTenantId,
+                        ProductCode = itemCode,
+                        Name = item.Name,
+                        Category = item.Category,
+                        Brand = row.Brand ?? "",
+                        Unit = item.Unit,
+                        Barcode = string.IsNullOrWhiteSpace(row.Barcode) ? $"890{Random.Shared.Next(100000000, 999999999)}" : row.Barcode.Trim(),
+                        PurchasePrice = row.PurchasePrice ?? 0m,
+                        SellingPrice = row.SellingPrice ?? 0m,
+                        MRP = row.MRP ?? (row.SellingPrice ?? 0m),
+                        OpeningStock = row.OpeningStock ?? 0m,
+                        CurrentStock = row.OpeningStock ?? 0m,
+                        MinimumStock = row.MinimumStock ?? 5m,
+                        IsActive = true,
+                        IsDeleted = false,
+                        CreatedBy = 1,
+                        EntrySource = "BulkImport",
+                        CreatedDate = DateTime.UtcNow,
+                        ModifiedDate = DateTime.UtcNow
+                    });
+                }
+            }
+
+            try
+            {
+                if (newItems.Count > 0)
+                {
+                    await _context.Items.AddRangeAsync(newItems);
+                    await _context.SaveChangesAsync();
+
+                    // Link stock items to saved items
+                    for (int sIdx = 0; sIdx < newStocks.Count; sIdx++)
+                    {
+                        var matchingItem = newItems.FirstOrDefault(item => item.ItemCode == newStocks[sIdx].ProductCode);
+                        if (matchingItem != null)
+                        {
+                            newStocks[sIdx].ItemId = matchingItem.ID;
+                        }
+                    }
+
+                    if (newStocks.Count > 0)
+                    {
+                        await _context.Stock.AddRangeAsync(newStocks);
+                        await _context.SaveChangesAsync();
+                    }
+
+                    result.SuccessCount += newItems.Count;
+                }
+            }
+            catch (Exception ex)
+            {
+                result.FailureCount += newItems.Count;
+                result.Errors.Add(new BulkImportRowError
+                {
+                    RowIndex = i + 1,
+                    Field = "Batch",
+                    ErrorMessage = $"Batch save failed: {ex.Message}"
+                });
+            }
+        }
+
+        return result;
     }
 }
+

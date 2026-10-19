@@ -1,3 +1,5 @@
+using VillageShop.Common.Models;
+
 namespace VillageShop.Application.Items.DTOs;
 
 public class CreateItemRequest
@@ -35,11 +37,10 @@ public class UpdateItemRequest
     public string? Description { get; set; }
 }
 
-public class ItemSearchRequest
+public class ItemSearchRequest : PagedRequest
 {
-    public long? TenantId { get; set; }
-    public string? TenantCode { get; set; }
-    public string? SearchTerm { get; set; }
-    public int PageNumber { get; set; } = 1;
-    public int PageSize { get; set; } = 200;
+    public long? CategoryId { get; set; }
+    public string? Category { get; set; }
+    public bool Paged { get; set; } = false;
 }
+

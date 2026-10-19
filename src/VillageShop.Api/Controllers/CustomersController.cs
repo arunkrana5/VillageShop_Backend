@@ -23,7 +23,16 @@ public class CustomersController : ControllerBase
     }
 
     [HttpGet]
-    public async Task<IActionResult> GetCustomers([FromQuery] long? tenantId, [FromQuery] string? tenantCode)
+    public async Task<IActionResult> GetCustomers(
+        [FromQuery] long? tenantId,
+        [FromQuery] string? tenantCode,
+        [FromQuery] string? search,
+        [FromQuery] int page = 1,
+        [FromQuery] int pageSize = 0,
+        [FromQuery] string? sortBy = "id",
+        [FromQuery] string? sortDirection = "desc",
+        [FromQuery] bool udhaarOnly = false,
+        [FromQuery] bool paged = false)
     {
         long targetTenantId = tenantId ?? 0;
         if (targetTenantId <= 0 && !string.IsNullOrWhiteSpace(tenantCode))
@@ -53,8 +62,42 @@ public class CustomersController : ControllerBase
             query = query.Where(c => c.TenantId == targetTenantId);
         }
 
-        var customers = await query
-            .OrderByDescending(c => c.ID)
+        if (udhaarOnly)
+        {
+            query = query.Where(c => c.CurrentBalance > 0);
+        }
+
+        if (!string.IsNullOrWhiteSpace(search))
+        {
+            var s = search.ToLower().Trim();
+            query = query.Where(c => (c.Name != null && c.Name.ToLower().Contains(s)) ||
+                                     (c.Mobile != null && c.Mobile.Contains(s)) ||
+                                     (c.Village != null && c.Village.ToLower().Contains(s)) ||
+                                     (c.FatherName != null && c.FatherName.ToLower().Contains(s)));
+        }
+
+        int totalCount = await query.CountAsync();
+
+        bool isAsc = string.Equals(sortDirection, "asc", StringComparison.OrdinalIgnoreCase);
+        var ordered = (sortBy?.Trim().ToLower()) switch
+        {
+            "name" => isAsc ? query.OrderBy(c => c.Name).ThenByDescending(c => c.ID) : query.OrderByDescending(c => c.Name).ThenByDescending(c => c.ID),
+            "udhaar" or "balance" or "currentbalance" => isAsc ? query.OrderBy(c => c.CurrentBalance).ThenByDescending(c => c.ID) : query.OrderByDescending(c => c.CurrentBalance).ThenByDescending(c => c.ID),
+            "date" or "modifieddate" => isAsc ? query.OrderBy(c => c.ModifiedDate).ThenByDescending(c => c.ID) : query.OrderByDescending(c => c.ModifiedDate).ThenByDescending(c => c.ID),
+            _ => isAsc ? query.OrderBy(c => c.ID) : query.OrderByDescending(c => c.ID)
+        };
+
+        if (pageSize > 0)
+        {
+            Response.Headers["X-Total-Count"] = totalCount.ToString();
+            Response.Headers["X-Page-Number"] = page.ToString();
+            Response.Headers["X-Page-Size"] = pageSize.ToString();
+            bool hasMore = page * pageSize < totalCount;
+            Response.Headers["X-Has-More"] = hasMore.ToString().ToLower();
+            ordered = (IOrderedQueryable<Customer>)ordered.Skip((page - 1) * pageSize).Take(pageSize);
+        }
+
+        var customers = await ordered
             .Select(c => new
             {
                 id = c.ID.ToString(),
@@ -79,8 +122,15 @@ public class CustomersController : ControllerBase
             })
             .ToListAsync();
 
+        bool returnPaged = paged || (Request.Query.ContainsKey("paged") && Request.Query["paged"] == "true") || (Request.Query.ContainsKey("page") && pageSize > 0 && Request.Query.ContainsKey("pageSize"));
+        if (returnPaged && pageSize > 0)
+        {
+            return Ok(PagedResult<object>.Create(customers.Cast<object>().ToList(), totalCount, page, pageSize));
+        }
+
         return Ok(customers);
     }
+
 
     [HttpPost]
     public async Task<IActionResult> CreateCustomer([FromBody] CustomerCreateRequest request)

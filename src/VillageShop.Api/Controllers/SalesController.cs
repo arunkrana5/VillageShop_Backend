@@ -27,7 +27,17 @@ public class SalesController : ControllerBase
     }
 
     [HttpGet]
-    public async Task<IActionResult> GetSales([FromQuery] long? tenantId, [FromQuery] string? tenantCode)
+    public async Task<IActionResult> GetSales(
+        [FromQuery] long? tenantId,
+        [FromQuery] string? tenantCode,
+        [FromQuery] string? search,
+        [FromQuery] int page = 1,
+        [FromQuery] int pageSize = 0,
+        [FromQuery] string? sortBy = "id",
+        [FromQuery] string? sortDirection = "desc",
+        [FromQuery] DateTime? startDate = null,
+        [FromQuery] DateTime? endDate = null,
+        [FromQuery] bool paged = false)
     {
         long targetTenantId = tenantId ?? 0;
         if (targetTenantId <= 0 && !string.IsNullOrWhiteSpace(tenantCode))
@@ -47,6 +57,8 @@ public class SalesController : ControllerBase
             if (tenant != null) targetTenantId = tenant.ID;
         }
 
+        bool isAsc = string.Equals(sortDirection, "asc", System.StringComparison.OrdinalIgnoreCase);
+
         try
         {
             var query = _context.Sales
@@ -62,8 +74,45 @@ public class SalesController : ControllerBase
                 query = query.Where(s => s.TenantId == targetTenantId);
             }
 
-            var sales = await query
-                .OrderByDescending(s => s.ID)
+            if (!string.IsNullOrWhiteSpace(search))
+            {
+                var term = search.ToLower().Trim();
+                query = query.Where(s => (s.InvoiceNumber != null && s.InvoiceNumber.ToLower().Contains(term)) ||
+                                         (s.Customer != null && s.Customer.Name.ToLower().Contains(term)) ||
+                                         (s.Customer != null && s.Customer.Mobile != null && s.Customer.Mobile.Contains(term)));
+            }
+
+            if (startDate.HasValue)
+            {
+                query = query.Where(s => s.CreatedDate >= startDate.Value);
+            }
+
+            if (endDate.HasValue)
+            {
+                query = query.Where(s => s.CreatedDate <= endDate.Value);
+            }
+
+            int totalCount = await query.CountAsync();
+
+            var ordered = (sortBy?.Trim().ToLower()) switch
+            {
+                "date" or "createddate" => isAsc ? query.OrderBy(s => s.CreatedDate).ThenByDescending(s => s.ID) : query.OrderByDescending(s => s.CreatedDate).ThenByDescending(s => s.ID),
+                "totalamount" or "amount" => isAsc ? query.OrderBy(s => s.TotalAmount).ThenByDescending(s => s.ID) : query.OrderByDescending(s => s.TotalAmount).ThenByDescending(s => s.ID),
+                "customer" => isAsc ? query.OrderBy(s => s.Customer != null ? s.Customer.Name : "").ThenByDescending(s => s.ID) : query.OrderByDescending(s => s.Customer != null ? s.Customer.Name : "").ThenByDescending(s => s.ID),
+                _ => isAsc ? query.OrderBy(s => s.ID) : query.OrderByDescending(s => s.ID)
+            };
+
+            if (pageSize > 0)
+            {
+                Response.Headers["X-Total-Count"] = totalCount.ToString();
+                Response.Headers["X-Page-Number"] = page.ToString();
+                Response.Headers["X-Page-Size"] = pageSize.ToString();
+                bool hasMore = page * pageSize < totalCount;
+                Response.Headers["X-Has-More"] = hasMore.ToString().ToLower();
+                ordered = (IOrderedQueryable<Sale>)ordered.Skip((page - 1) * pageSize).Take(pageSize);
+            }
+
+            var sales = await ordered
                 .Select(s => new
                 {
                     id = s.InvoiceNumber ?? $"INV-{s.ID}",
@@ -114,6 +163,12 @@ public class SalesController : ControllerBase
                 })
                 .ToListAsync();
 
+            bool returnPaged = paged || (Request.Query.ContainsKey("paged") && Request.Query["paged"] == "true") || (Request.Query.ContainsKey("page") && pageSize > 0 && Request.Query.ContainsKey("pageSize"));
+            if (returnPaged && pageSize > 0)
+            {
+                return Ok(PagedResult<object>.Create(sales.Cast<object>().ToList(), totalCount, page, pageSize));
+            }
+
             return Ok(sales);
         }
         catch (System.Exception ex)
@@ -133,8 +188,29 @@ public class SalesController : ControllerBase
                     fallbackQuery = fallbackQuery.Where(s => s.TenantId == targetTenantId);
                 }
 
-                var fallbackSales = await fallbackQuery
-                    .OrderByDescending(s => s.ID)
+                if (!string.IsNullOrWhiteSpace(search))
+                {
+                    var term = search.ToLower().Trim();
+                    fallbackQuery = fallbackQuery.Where(s => (s.InvoiceNumber != null && s.InvoiceNumber.ToLower().Contains(term)) ||
+                                                             (s.Customer != null && s.Customer.Name.ToLower().Contains(term)) ||
+                                                             (s.Customer != null && s.Customer.Mobile != null && s.Customer.Mobile.Contains(term)));
+                }
+
+                int totalCount = await fallbackQuery.CountAsync();
+
+                var fallbackOrdered = isAsc ? fallbackQuery.OrderBy(s => s.ID) : fallbackQuery.OrderByDescending(s => s.ID);
+
+                if (pageSize > 0)
+                {
+                    Response.Headers["X-Total-Count"] = totalCount.ToString();
+                    Response.Headers["X-Page-Number"] = page.ToString();
+                    Response.Headers["X-Page-Size"] = pageSize.ToString();
+                    bool hasMore = page * pageSize < totalCount;
+                    Response.Headers["X-Has-More"] = hasMore.ToString().ToLower();
+                    fallbackOrdered = (IOrderedQueryable<Sale>)fallbackOrdered.Skip((page - 1) * pageSize).Take(pageSize);
+                }
+
+                var fallbackSales = await fallbackOrdered
                     .Select(s => new
                     {
                         id = s.InvoiceNumber ?? $"INV-{s.ID}",
@@ -175,9 +251,16 @@ public class SalesController : ControllerBase
                     })
                     .ToListAsync();
 
+                bool returnPaged = paged || (Request.Query.ContainsKey("paged") && Request.Query["paged"] == "true") || (Request.Query.ContainsKey("page") && pageSize > 0 && Request.Query.ContainsKey("pageSize"));
+                if (returnPaged && pageSize > 0)
+                {
+                    return Ok(PagedResult<object>.Create(fallbackSales.Cast<object>().ToList(), totalCount, page, pageSize));
+                }
+
                 return Ok(fallbackSales);
             }
             catch (System.Exception)
+
             {
                 return Ok(new System.Collections.Generic.List<object>());
             }

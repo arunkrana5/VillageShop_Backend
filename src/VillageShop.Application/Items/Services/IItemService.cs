@@ -13,4 +13,7 @@ public interface IItemService
     Task<PostResponse> DeleteAsync(long id);
     Task<Item?> GetByIdAsync(long id);
     Task<IEnumerable<Item>> SearchAsync(ItemSearchRequest request);
+    Task<PagedResult<Item>> SearchPagedAsync(ItemSearchRequest request);
+    Task<BulkImportResult> BulkImportAsync(BulkImportRequest request);
 }
+

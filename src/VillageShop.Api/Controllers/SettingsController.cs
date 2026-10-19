@@ -152,6 +152,7 @@ public class SettingsController : ControllerBase
         var defaults = await GetInitialDefaultConfigForTenantAsync(targetTenantId);
         if (newConfig.Tenants == null || newConfig.Tenants.Count == 0) newConfig.Tenants = defaults.Tenants;
         if (newConfig.MenuItems == null || newConfig.MenuItems.Count == 0) newConfig.MenuItems = defaults.MenuItems;
+        if (newConfig.UpiAccounts == null || newConfig.UpiAccounts.Count == 0) newConfig.UpiAccounts = defaults.UpiAccounts;
 
         _tenantConfigCache[targetTenantId] = newConfig;
 
@@ -210,7 +211,8 @@ public class SettingsController : ControllerBase
                 supportHours = newConfig.SupportHours,
                 whatsappGatewayUrl = newConfig.WhatsappGatewayUrl,
                 whatsappInstanceId = newConfig.WhatsappInstanceId,
-                whatsappApiKey = newConfig.WhatsappApiKey
+                whatsappApiKey = newConfig.WhatsappApiKey,
+                upiAccounts = newConfig.UpiAccounts
             };
 
             var featureObj = new
@@ -267,9 +269,30 @@ public class SettingsController : ControllerBase
     }
 
     [HttpGet("tenants")]
-    public async Task<IActionResult> GetTenants()
+    public async Task<IActionResult> GetTenants(
+        [FromQuery] string? search = null,
+        [FromQuery] int page = 1,
+        [FromQuery] int pageSize = 0,
+        [FromQuery] bool paged = false)
     {
-        var dbTenants = await _context.Tenants.IgnoreQueryFilters().Where(t => !t.IsDeleted).ToListAsync();
+        var query = _context.Tenants.IgnoreQueryFilters().Where(t => !t.IsDeleted);
+
+        if (!string.IsNullOrWhiteSpace(search))
+        {
+            var s = search.Trim().ToLower();
+            query = query.Where(t => t.TenantName.ToLower().Contains(s) ||
+                                     t.TenantCode.ToLower().Contains(s) ||
+                                     (t.OwnerName != null && t.OwnerName.ToLower().Contains(s)) ||
+                                     (t.Mobile != null && t.Mobile.Contains(s)));
+        }
+
+        int totalCount = await query.CountAsync();
+        var ordered = query.OrderBy(t => t.ID);
+
+        var dbTenants = (pageSize > 0)
+            ? await ordered.Skip((page - 1) * pageSize).Take(pageSize).ToListAsync()
+            : await ordered.ToListAsync();
+
         var tenantList = new List<TenantInfo>();
 
         foreach (var t in dbTenants)
@@ -305,6 +328,21 @@ public class SettingsController : ControllerBase
                 AdminUsername = adminUser?.Username ?? "admin",
                 PrimaryColor = primaryHex
             });
+        }
+
+        if (pageSize > 0)
+        {
+            Response.Headers["X-Total-Count"] = totalCount.ToString();
+            Response.Headers["X-Page-Number"] = page.ToString();
+            Response.Headers["X-Page-Size"] = pageSize.ToString();
+            bool hasMore = page * pageSize < totalCount;
+            Response.Headers["X-Has-More"] = hasMore.ToString().ToLower();
+        }
+
+        bool returnPaged = paged || (Request.Query.ContainsKey("paged") && Request.Query["paged"] == "true") || (Request.Query.ContainsKey("page") && pageSize > 0 && Request.Query.ContainsKey("pageSize"));
+        if (returnPaged && pageSize > 0)
+        {
+            return Ok(PagedResult<TenantInfo>.Create(tenantList, totalCount, page, pageSize));
         }
 
         return Ok(new PostResponse
@@ -556,7 +594,8 @@ public class SettingsController : ControllerBase
                 supportHours = loadedConfig.SupportHours,
                 whatsappGatewayUrl = loadedConfig.WhatsappGatewayUrl,
                 whatsappInstanceId = loadedConfig.WhatsappInstanceId,
-                whatsappApiKey = loadedConfig.WhatsappApiKey
+                whatsappApiKey = loadedConfig.WhatsappApiKey,
+                upiAccounts = loadedConfig.UpiAccounts
             };
 
             var brandingJsonStr = JsonSerializer.Serialize(brandingObj, JsonOpts);
@@ -829,9 +868,23 @@ public class SettingsController : ControllerBase
                 new MenuItemConfig { Id = "pos", TitleEn = "New Sale / POS", TitleHi = "नया बिल / POS", Icon = "point_of_sale_rounded", Route = "/pos", IsEnabled = true, BadgeText = "FAST" },
                 new MenuItemConfig { Id = "items", TitleEn = "Items & Catalog", TitleHi = "सामान (Items)", Icon = "assignment_rounded", Route = "/items", IsEnabled = true },
                 new MenuItemConfig { Id = "stock", TitleEn = "Stock & Inventory", TitleHi = "स्टॉक (Stock)", Icon = "inventory_2_rounded", Route = "/stock", IsEnabled = true },
+                new MenuItemConfig { Id = "sales-history", TitleEn = "Sale History & Invoices", TitleHi = "बिक्री इतिहास (Sale History)", Icon = "receipt_long_rounded", Route = "/sales-history", IsEnabled = true, BadgeText = "PRINT" },
                 new MenuItemConfig { Id = "customers", TitleEn = "Customer Udhaar", TitleHi = "ग्राहक उधार खाता", Icon = "people_alt_rounded", Route = "/customers", IsEnabled = true },
                 new MenuItemConfig { Id = "reports", TitleEn = "Reports & Earnings", TitleHi = "रिपोर्ट और कमाई", Icon = "analytics_rounded", Route = "/reports", IsEnabled = true },
+                new MenuItemConfig { Id = "masters", TitleEn = "Master Taxonomy", TitleHi = "मास्टर डेटा", Icon = "category_rounded", Route = "/masters", IsEnabled = true },
                 new MenuItemConfig { Id = "settings", TitleEn = "Settings", TitleHi = "सेटिंग्स", Icon = "settings_rounded", Route = "/settings", IsEnabled = true },
+            },
+            UpiAccounts = new List<UpiAccountDto>
+            {
+                new UpiAccountDto
+                {
+                    Id = Guid.NewGuid().ToString(),
+                    UpiId = $"{tMobile.Replace(" ", "").Replace("+91", "")}@upi",
+                    AccountName = tName,
+                    BankName = "State Bank of India",
+                    Label = "Primary Shop QR",
+                    IsDefault = true
+                }
             }
         };
 

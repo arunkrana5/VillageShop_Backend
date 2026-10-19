@@ -13,4 +13,6 @@ public interface IStockService
     Task<PostResponse> DeleteAsync(long id);
     Task<Stock?> GetByIdAsync(long id);
     Task<IEnumerable<Stock>> SearchAsync(StockInSearchRequest request);
+    Task<PagedResult<Stock>> SearchPagedAsync(StockInSearchRequest request);
 }
+

@@ -176,11 +176,8 @@ public class StockService : IStockService
         return await _context.Stock.IgnoreQueryFilters().FirstOrDefaultAsync(p => p.ID == id && !p.IsDeleted);
     }
 
-    public async Task<IEnumerable<Stock>> SearchAsync(StockInSearchRequest request)
+    private async Task<IQueryable<Stock>> BuildStockQueryAsync(StockInSearchRequest request)
     {
-        var pageNumber = request.PageNumber <= 0 ? 1 : request.PageNumber;
-        var pageSize = request.PageSize <= 0 ? 200 : request.PageSize;
-
         long targetTenantId = request.TenantId ?? 0;
         if (targetTenantId <= 0 && !string.IsNullOrWhiteSpace(request.TenantCode))
         {
@@ -244,11 +241,35 @@ public class StockService : IStockService
 
         if (!string.IsNullOrWhiteSpace(request.Category))
         {
-            joinedQuery = joinedQuery.Where(p => p.Category == request.Category);
+            var catLower = request.Category.Trim().ToLower();
+            joinedQuery = joinedQuery.Where(p => p.Category != null && p.Category.ToLower() == catLower);
         }
 
-        var stockList = await joinedQuery
-            .OrderByDescending(p => p.ID)
+        return joinedQuery;
+    }
+
+    private static IQueryable<Stock> ApplyStockSorting(IQueryable<Stock> query, string? sortBy, string? sortDirection)
+    {
+        bool isAsc = string.Equals(sortDirection, "asc", StringComparison.OrdinalIgnoreCase);
+        return (sortBy?.Trim().ToLower()) switch
+        {
+            "name" => isAsc ? query.OrderBy(p => p.Name).ThenByDescending(p => p.ID) : query.OrderByDescending(p => p.Name).ThenByDescending(p => p.ID),
+            "category" => isAsc ? query.OrderBy(p => p.Category).ThenByDescending(p => p.ID) : query.OrderByDescending(p => p.Category).ThenByDescending(p => p.ID),
+            "currentstock" or "stock" => isAsc ? query.OrderBy(p => p.CurrentStock).ThenByDescending(p => p.ID) : query.OrderByDescending(p => p.CurrentStock).ThenByDescending(p => p.ID),
+            "sellingprice" or "price" => isAsc ? query.OrderBy(p => p.SellingPrice).ThenByDescending(p => p.ID) : query.OrderByDescending(p => p.SellingPrice).ThenByDescending(p => p.ID),
+            _ => isAsc ? query.OrderBy(p => p.ID) : query.OrderByDescending(p => p.ID)
+        };
+    }
+
+    public async Task<IEnumerable<Stock>> SearchAsync(StockInSearchRequest request)
+    {
+        var pageNumber = request.PageNumber <= 0 ? 1 : request.PageNumber;
+        var pageSize = request.PageSize <= 0 ? 200 : Math.Min(request.PageSize, 200);
+
+        var joinedQuery = await BuildStockQueryAsync(request);
+        var sortedQuery = ApplyStockSorting(joinedQuery, request.SortBy, request.SortDirection);
+
+        var stockList = await sortedQuery
             .Skip((pageNumber - 1) * pageSize)
             .Take(pageSize)
             .ToListAsync();
@@ -263,4 +284,31 @@ public class StockService : IStockService
 
         return stockList;
     }
+
+    public async Task<PagedResult<Stock>> SearchPagedAsync(StockInSearchRequest request)
+    {
+        var pageNumber = request.PageNumber <= 0 ? 1 : request.PageNumber;
+        var pageSize = request.PageSize <= 0 ? 25 : Math.Min(request.PageSize, 200);
+
+        var joinedQuery = await BuildStockQueryAsync(request);
+        int totalCount = await joinedQuery.CountAsync();
+
+        var sortedQuery = ApplyStockSorting(joinedQuery, request.SortBy, request.SortDirection);
+
+        var stockList = await sortedQuery
+            .Skip((pageNumber - 1) * pageSize)
+            .Take(pageSize)
+            .ToListAsync();
+
+        foreach (var stock in stockList)
+        {
+            if (stock.ImageUrl != null && stock.ImageUrl.Length > 500000)
+            {
+                stock.ImageUrl = "";
+            }
+        }
+
+        return PagedResult<Stock>.Create(stockList, totalCount, pageNumber, pageSize);
+    }
 }
+
