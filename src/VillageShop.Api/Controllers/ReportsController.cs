@@ -46,7 +46,7 @@ public class ReportsController : ControllerBase
     }
 
     [HttpGet("dashboard-metrics")]
-    public async Task<IActionResult> GetDashboardMetrics([FromQuery] long? tenantId, [FromQuery] string? tenantCode)
+    public async Task<IActionResult> GetDashboardMetrics([FromQuery] long? tenantId, [FromQuery] string? tenantCode, [FromQuery] int days = 7)
     {
         long targetTenantId = await ResolveTenantIdAsync(tenantId, tenantCode);
 
@@ -106,10 +106,11 @@ public class ReportsController : ControllerBase
             })
             .ToListAsync();
 
-        // 7-day daily trend directly aggregated in SQL Server
-        DateTime weekAgoUtc = todayUtc.AddDays(-6);
-        var rawTrend = await salesQuery
-            .Where(s => s.CreatedDate >= weekAgoUtc)
+        // Daily trend directly aggregated in SQL Server (configurable days)
+        DateTime? startDate = days > 0 ? todayUtc.AddDays(-(days - 1)) : null;
+        var trendSalesQuery = startDate.HasValue ? salesQuery.Where(s => s.CreatedDate >= startDate.Value) : salesQuery;
+
+        var rawTrend = await trendSalesQuery
             .GroupBy(s => s.CreatedDate.Date)
             .Select(g => new
             {
@@ -147,8 +148,32 @@ public class ReportsController : ControllerBase
             .Take(5)
             .ToListAsync();
 
+        // Settlement breakdown (Fully Paid vs Credit/Udhaar)
+        var completedSales = await salesQuery.Where(s => s.UdhaarAmount <= 0).CountAsync();
+        var creditSales = await salesQuery.Where(s => s.UdhaarAmount > 0).CountAsync();
+        var settlementBreakdown = new[]
+        {
+            new { status = "Fully Paid", count = completedSales, total = cashSales + upiSales, color = "#10B981" },
+            new { status = "Credit / Udhaar", count = creditSales, total = udhaarSales, color = "#EF4444" }
+        };
+
+        // Category breakdown (Top categories by stock count and valuation)
+        var stockCategories = await stockQuery
+            .GroupBy(s => string.IsNullOrWhiteSpace(s.Category) ? "General" : s.Category)
+            .Select(g => new
+            {
+                category = g.Key,
+                productCount = g.Count(),
+                totalStock = g.Sum(s => (double)s.CurrentStock),
+                totalValue = g.Sum(s => (double)(s.CurrentStock * s.SellingPrice))
+            })
+            .OrderByDescending(x => x.totalValue)
+            .Take(6)
+            .ToListAsync();
+
         return Ok(new
         {
+            days,
             totalSales,
             totalRevenue,
             todaySales,
@@ -164,7 +189,9 @@ public class ReportsController : ControllerBase
             recentSales,
             paymentBreakdown,
             dailyTrend,
-            topSellingProducts
+            topSellingProducts,
+            settlementBreakdown,
+            categorySummary = stockCategories
         });
     }
 
