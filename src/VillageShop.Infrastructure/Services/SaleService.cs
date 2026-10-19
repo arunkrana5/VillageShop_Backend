@@ -100,7 +100,7 @@ public class SaleService : ISaleService
             {
                 TenantId = targetTenantId,
                 Name = request.CustomerName,
-                Mobile = "",
+                Mobile = request.CustomerMobile ?? "",
                 CurrentBalance = 0
             };
             _context.Customers.Add(targetCustomer);
@@ -269,6 +269,10 @@ public class SaleService : ISaleService
         // 3. Customer Purchase & Udhaar Ledger Tracking
         if (targetCustomer != null)
         {
+            if (string.IsNullOrWhiteSpace(targetCustomer.Mobile) && !string.IsNullOrWhiteSpace(request.CustomerMobile))
+            {
+                targetCustomer.Mobile = request.CustomerMobile;
+            }
             if (udhaarAmount > 0)
             {
                 targetCustomer.CurrentBalance += udhaarAmount;

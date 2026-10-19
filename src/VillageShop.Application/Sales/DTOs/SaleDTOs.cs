@@ -84,6 +84,23 @@ public class CreateSaleRequest
         set => _customerName = string.IsNullOrWhiteSpace(_customerName) ? value : _customerName;
     }
 
+    private string? _customerMobile;
+    public string? CustomerMobile
+    {
+        get => _customerMobile;
+        set => _customerMobile = value;
+    }
+    public string? CustomerPhone
+    {
+        get => _customerMobile;
+        set => _customerMobile = string.IsNullOrWhiteSpace(_customerMobile) ? value : _customerMobile;
+    }
+    public string? Phone
+    {
+        get => _customerMobile;
+        set => _customerMobile = string.IsNullOrWhiteSpace(_customerMobile) ? value : _customerMobile;
+    }
+
     private decimal _totalAmount;
     public decimal TotalAmount
     {
