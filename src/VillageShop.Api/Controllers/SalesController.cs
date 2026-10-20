@@ -378,20 +378,22 @@ public class SalesController : ControllerBase
             return BadRequest(PostResponse.Error("Phone number and message content are required.", 400));
         }
 
-        string cleanPhone = new string(request.Phone.Where(char.IsDigit).ToArray());
-        if (!cleanPhone.StartsWith("91") && cleanPhone.Length == 10)
-        {
-            cleanPhone = "91" + cleanPhone;
-        }
-
         long targetTenantId = request.TenantId ?? 0;
         if (targetTenantId <= 0 && Request.Headers.TryGetValue("X-Tenant-Id", out var headerTidStr) && long.TryParse(headerTidStr, out var headerTid) && headerTid > 0)
         {
             targetTenantId = headerTid;
         }
 
-        bool sent = await _saleService.SendServerWhatsAppAsync(cleanPhone, request.Message, targetTenantId);
-        return Ok(PostResponse.Success("Server WhatsApp gateway processed message successfully for customer phone: " + cleanPhone));
+        var result = await _saleService.SendServerWhatsAppAsync(request.Phone, request.Message, targetTenantId);
+
+        if (result.Success)
+        {
+            return Ok(PostResponse.Success(result.Message, id: 0, additionalMessage: result.MessageId ?? ""));
+        }
+        else
+        {
+            return StatusCode(result.StatusCode, PostResponse.Error(result.Message, result.StatusCode, additionalMessage: result.ErrorDetails ?? ""));
+        }
     }
 }
 

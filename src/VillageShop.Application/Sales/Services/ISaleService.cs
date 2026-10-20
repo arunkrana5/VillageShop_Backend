@@ -9,5 +9,5 @@ public interface ISaleService
 {
     Task<PostResponse> CreateSaleAsync(CreateSaleRequest request);
     Task<Sale?> GetSaleByIdAsync(long id);
-    Task<bool> SendServerWhatsAppAsync(string phone, string message, long tenantId = 0);
+    Task<WhatsAppSendResult> SendServerWhatsAppAsync(string phone, string message, long tenantId = 0);
 }

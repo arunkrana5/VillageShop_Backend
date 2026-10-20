@@ -9,6 +9,7 @@ using VillageShop.Application.Common.Interfaces;
 using VillageShop.Application.Sales.DTOs;
 using VillageShop.Application.Sales.Services;
 using VillageShop.Common.Models;
+using VillageShop.Common.Utils;
 using VillageShop.Domain.Entities;
 
 namespace VillageShop.Infrastructure.Services;
@@ -325,15 +326,28 @@ public class SaleService : ISaleService
             .FirstOrDefaultAsync(s => s.ID == id && !s.IsDeleted);
     }
 
-    public async Task<bool> SendServerWhatsAppAsync(string phone, string message, long tenantId = 0)
+    public async Task<WhatsAppSendResult> SendServerWhatsAppAsync(string phone, string message, long tenantId = 0)
     {
+        // 1. Phone number normalization and validation
+        var norm = WhatsAppPhoneNormalizer.Normalize(phone);
+        if (!norm.IsValid)
+        {
+            return new WhatsAppSendResult
+            {
+                Success = false,
+                StatusCode = 400,
+                Message = norm.ErrorMessage,
+                NormalizedPhone = phone
+            };
+        }
+
         try
         {
             string gatewayUrl = _configuration["WhatsApp:GatewayUrl"] ?? "";
             string apiKey = _configuration["WhatsApp:ApiKey"] ?? "";
             string instanceId = _configuration["WhatsApp:InstanceId"] ?? "";
 
-            // 1. Prioritize Database TenantConfiguration table (V_TenantConfigurations)
+            // 2. Resolve credentials from Database TenantConfiguration table (V_TenantConfigurations)
             var dbConfig = await _context.TenantConfigurations
                 .IgnoreQueryFilters()
                 .AsNoTracking()
@@ -358,50 +372,176 @@ public class SaleService : ISaleService
                 catch (Exception) {}
             }
 
-            if (!string.IsNullOrWhiteSpace(gatewayUrl))
+            if (string.IsNullOrWhiteSpace(gatewayUrl))
             {
-                using var httpClient = new HttpClient();
-
-                // Green-API Gateway handling
-                if (gatewayUrl.Contains("green-api.com", StringComparison.OrdinalIgnoreCase))
+                return new WhatsAppSendResult
                 {
-                    string finalUrl = gatewayUrl;
-                    if (finalUrl.Contains("{idInstance}") && !string.IsNullOrWhiteSpace(instanceId))
-                        finalUrl = finalUrl.Replace("{idInstance}", instanceId);
-                    if (finalUrl.Contains("{apiTokenInstance}") && !string.IsNullOrWhiteSpace(apiKey))
-                        finalUrl = finalUrl.Replace("{apiTokenInstance}", apiKey);
+                    Success = false,
+                    StatusCode = 503,
+                    Message = "WhatsApp Gateway URL is not configured.",
+                    NormalizedPhone = norm.NormalizedPhone,
+                    ChatId = norm.ChatId
+                };
+            }
 
-                    string chatId = phone.EndsWith("@c.us") ? phone : $"{phone}@c.us";
-                    var greenPayload = new { chatId = chatId, message = message };
-                    var json = System.Text.Json.JsonSerializer.Serialize(greenPayload);
-                    var content = new StringContent(json, System.Text.Encoding.UTF8, "application/json");
-                    var res = await httpClient.PostAsync(finalUrl, content);
-                    return res.IsSuccessStatusCode;
+            using var httpClient = new HttpClient { Timeout = TimeSpan.FromSeconds(15) };
+
+            // 3. Green-API Gateway handling
+            if (gatewayUrl.Contains("green-api.com", StringComparison.OrdinalIgnoreCase))
+            {
+                if (string.IsNullOrWhiteSpace(instanceId) || string.IsNullOrWhiteSpace(apiKey))
+                {
+                    return new WhatsAppSendResult
+                    {
+                        Success = false,
+                        StatusCode = 503,
+                        Message = "Green API instance ID or API token is missing. Please check WhatsApp settings.",
+                        NormalizedPhone = norm.NormalizedPhone,
+                        ChatId = norm.ChatId
+                    };
                 }
-                // Generic Webhook / Cloud Gateway handling
+
+                // A. Pre-flight check via Green API checkWhatsapp endpoint
+                try
+                {
+                    string checkUrl = $"https://api.green-api.com/waInstance{instanceId}/checkWhatsapp/{apiKey}";
+                    if (long.TryParse(norm.NormalizedPhone, out long numericPhone))
+                    {
+                        var checkPayload = new { phoneNumber = numericPhone };
+                        var checkJson = System.Text.Json.JsonSerializer.Serialize(checkPayload);
+                        var checkContent = new StringContent(checkJson, System.Text.Encoding.UTF8, "application/json");
+                        var checkRes = await httpClient.PostAsync(checkUrl, checkContent);
+                        if (checkRes.IsSuccessStatusCode)
+                        {
+                            var checkStr = await checkRes.Content.ReadAsStringAsync();
+                            using var checkDoc = System.Text.Json.JsonDocument.Parse(checkStr);
+                            if (checkDoc.RootElement.TryGetProperty("existsWhatsapp", out var existsProp) && !existsProp.GetBoolean())
+                            {
+                                return new WhatsAppSendResult
+                                {
+                                    Success = false,
+                                    StatusCode = 422,
+                                    ExistsOnWhatsApp = false,
+                                    NormalizedPhone = norm.NormalizedPhone,
+                                    ChatId = norm.ChatId,
+                                    Message = $"Customer mobile number +{norm.NormalizedPhone} is not registered on WhatsApp."
+                                };
+                            }
+                        }
+                    }
+                }
+                catch (Exception)
+                {
+                    // If pre-flight check fails due to network/transient issue, proceed to sendMessage attempt
+                }
+
+                // B. Send Message
+                string sendUrl = $"https://api.green-api.com/waInstance{instanceId}/sendMessage/{apiKey}";
+                var greenPayload = new { chatId = norm.ChatId, message = message };
+                var json = System.Text.Json.JsonSerializer.Serialize(greenPayload);
+                var content = new StringContent(json, System.Text.Encoding.UTF8, "application/json");
+                var res = await httpClient.PostAsync(sendUrl, content);
+                var resStr = await res.Content.ReadAsStringAsync();
+
+                if (res.IsSuccessStatusCode)
+                {
+                    string messageId = "";
+                    try
+                    {
+                        using var resDoc = System.Text.Json.JsonDocument.Parse(resStr);
+                        if (resDoc.RootElement.TryGetProperty("idMessage", out var idProp))
+                        {
+                            messageId = idProp.GetString() ?? "";
+                        }
+                    }
+                    catch (Exception) {}
+
+                    return new WhatsAppSendResult
+                    {
+                        Success = true,
+                        StatusCode = 200,
+                        Message = $"WhatsApp message sent successfully (Message ID: {messageId})",
+                        MessageId = messageId,
+                        NormalizedPhone = norm.NormalizedPhone,
+                        ChatId = norm.ChatId,
+                        ExistsOnWhatsApp = true
+                    };
+                }
                 else
                 {
-                    if (!string.IsNullOrWhiteSpace(apiKey))
-                    {
-                        httpClient.DefaultRequestHeaders.TryAddWithoutValidation("Authorization", $"Bearer {apiKey}");
-                    }
+                    int errCode = (int)res.StatusCode;
+                    string userErr = errCode == 466
+                        ? $"Green API rejected recipient +{norm.NormalizedPhone} (Error 466: Invalid number or not registered)."
+                        : $"Green API error: HTTP {errCode}.";
 
-                    var genericPayload = new
+                    return new WhatsAppSendResult
                     {
-                        phone = phone,
-                        chatId = $"{phone}@c.us",
-                        message = message
+                        Success = false,
+                        StatusCode = errCode >= 400 && errCode < 600 ? errCode : 502,
+                        Message = userErr,
+                        ErrorDetails = resStr,
+                        NormalizedPhone = norm.NormalizedPhone,
+                        ChatId = norm.ChatId
                     };
+                }
+            }
+            // 4. Generic Webhook / Cloud Gateway handling
+            else
+            {
+                if (!string.IsNullOrWhiteSpace(apiKey))
+                {
+                    httpClient.DefaultRequestHeaders.TryAddWithoutValidation("Authorization", $"Bearer {apiKey}");
+                }
 
-                    var json = System.Text.Json.JsonSerializer.Serialize(genericPayload);
-                    var content = new StringContent(json, System.Text.Encoding.UTF8, "application/json");
-                    var res = await httpClient.PostAsync(gatewayUrl, content);
-                    return res.IsSuccessStatusCode;
+                var genericPayload = new
+                {
+                    phone = norm.NormalizedPhone,
+                    chatId = norm.ChatId,
+                    message = message
+                };
+
+                var json = System.Text.Json.JsonSerializer.Serialize(genericPayload);
+                var content = new StringContent(json, System.Text.Encoding.UTF8, "application/json");
+                var res = await httpClient.PostAsync(gatewayUrl, content);
+                var resStr = await res.Content.ReadAsStringAsync();
+
+                if (res.IsSuccessStatusCode)
+                {
+                    return new WhatsAppSendResult
+                    {
+                        Success = true,
+                        StatusCode = 200,
+                        Message = "WhatsApp message dispatched successfully.",
+                        NormalizedPhone = norm.NormalizedPhone,
+                        ChatId = norm.ChatId,
+                        ExistsOnWhatsApp = true
+                    };
+                }
+                else
+                {
+                    return new WhatsAppSendResult
+                    {
+                        Success = false,
+                        StatusCode = (int)res.StatusCode,
+                        Message = $"Cloud Gateway returned error status: HTTP {(int)res.StatusCode}",
+                        ErrorDetails = resStr,
+                        NormalizedPhone = norm.NormalizedPhone,
+                        ChatId = norm.ChatId
+                    };
                 }
             }
         }
-        catch (Exception) {}
-        return true;
+        catch (Exception ex)
+        {
+            return new WhatsAppSendResult
+            {
+                Success = false,
+                StatusCode = 500,
+                Message = $"Failed to communicate with WhatsApp Gateway: {ex.Message}",
+                NormalizedPhone = norm.NormalizedPhone,
+                ChatId = norm.ChatId
+            };
+        }
     }
 
     private static string GetJsonStringProp(System.Text.Json.JsonElement root, params string[] names)

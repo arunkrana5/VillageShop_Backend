@@ -164,3 +164,15 @@ public class SaleDto
     public string? Notes { get; set; }
     public List<SalePaymentDto> Payments { get; set; } = new();
 }
+
+public class WhatsAppSendResult
+{
+    public bool Success { get; set; }
+    public int StatusCode { get; set; } = 200;
+    public string Message { get; set; } = string.Empty;
+    public string? MessageId { get; set; }
+    public string? NormalizedPhone { get; set; }
+    public string? ChatId { get; set; }
+    public bool ExistsOnWhatsApp { get; set; } = true;
+    public string? ErrorDetails { get; set; }
+}
