@@ -4,3 +4,5 @@ obj/
 *.user
 *.suo
 villageshop_database.db
+public_web/
+build/
