@@ -186,14 +186,20 @@ public class ApplicationDbContext : DbContext, IApplicationDbContext
                 if (entry.State == EntityState.Added)
                 {
                     entity.CreatedDate = DateTime.UtcNow;
-                    entity.CreatedBy = currentUserId;
+                    entity.CreatedBy = currentUserId > 0 
+                        ? currentUserId 
+                        : (entity.CreatedBy > 0 ? entity.CreatedBy : (entry.Entity is BaseTenantEntity bte && bte.TenantId > 0 ? bte.TenantId : 0));
                     entity.ModifiedDate = DateTime.UtcNow;
-                    entity.ModifiedBy = currentUserId;
+                    entity.ModifiedBy = currentUserId > 0 
+                        ? currentUserId 
+                        : (entity.ModifiedBy > 0 ? entity.ModifiedBy : (entry.Entity is BaseTenantEntity bte2 && bte2.TenantId > 0 ? bte2.TenantId : 0));
                 }
                 else if (entry.State == EntityState.Modified)
                 {
                     entity.ModifiedDate = DateTime.UtcNow;
-                    entity.ModifiedBy = currentUserId;
+                    entity.ModifiedBy = currentUserId > 0 
+                        ? currentUserId 
+                        : (entity.ModifiedBy > 0 ? entity.ModifiedBy : (entry.Entity is BaseTenantEntity bte && bte.TenantId > 0 ? bte.TenantId : 0));
                 }
             }
         }
