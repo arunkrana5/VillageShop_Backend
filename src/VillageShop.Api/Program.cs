@@ -51,6 +51,9 @@ builder.Services.AddScoped<IAuthService, AuthService>();
 builder.Services.AddScoped<IItemService, ItemService>();
 builder.Services.AddScoped<IStockService, StockService>();
 builder.Services.AddScoped<ISaleService, SaleService>();
+builder.Services.AddSingleton<VillageShop.Infrastructure.Uploader.UploadProcessingChannel>();
+builder.Services.AddScoped<VillageShop.Infrastructure.Uploader.IExcelUploaderService, VillageShop.Infrastructure.Uploader.ExcelUploaderService>();
+builder.Services.AddHostedService<VillageShop.Infrastructure.Uploader.UploadProcessingBackgroundService>();
 
 // JWT Authentication Configuration
 var jwtSecret = builder.Configuration["Jwt:Secret"] ?? "VillageShopSecretSuperSecureKey_2026_MustBeLongEnough!";
