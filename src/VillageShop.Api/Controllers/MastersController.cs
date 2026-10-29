@@ -78,7 +78,38 @@ public class MastersController : ControllerBase
         if (!string.IsNullOrWhiteSpace(masterType))
         {
             var mType = masterType.Trim().ToLower();
-            query = query.Where(m => m.MasterType.ToLower() == mType);
+            if (mType is "itemcategory" or "category" or "categories")
+            {
+                query = query.Where(m => m.MasterType.ToLower() == "itemcategory" || m.MasterType.ToLower() == "category" || m.MasterType.ToLower() == "categories");
+            }
+            else if (mType is "unitofmeasurement" or "unit" or "units" or "uom")
+            {
+                query = query.Where(m => m.MasterType.ToLower() == "unitofmeasurement" || m.MasterType.ToLower() == "unit" || m.MasterType.ToLower() == "units" || m.MasterType.ToLower() == "uom");
+            }
+            else if (mType is "itemtype" or "item_type" or "itemtypes" or "format")
+            {
+                query = query.Where(m => m.MasterType.ToLower() == "itemtype" || m.MasterType.ToLower() == "item_type" || m.MasterType.ToLower() == "itemtypes" || m.MasterType.ToLower() == "format");
+            }
+            else if (mType is "brand" or "brands")
+            {
+                query = query.Where(m => m.MasterType.ToLower() == "brand" || m.MasterType.ToLower() == "brands");
+            }
+            else if (mType is "paymentmode" or "paymentmodes" or "payment")
+            {
+                query = query.Where(m => m.MasterType.ToLower() == "paymentmode" || m.MasterType.ToLower() == "paymentmodes" || m.MasterType.ToLower() == "payment");
+            }
+            else if (mType is "tax" or "taxes" or "gst")
+            {
+                query = query.Where(m => m.MasterType.ToLower() == "tax" || m.MasterType.ToLower() == "taxes" || m.MasterType.ToLower() == "gst");
+            }
+            else if (mType is "expensecategory" or "expensecategories" or "expense" or "expenses")
+            {
+                query = query.Where(m => m.MasterType.ToLower() == "expensecategory" || m.MasterType.ToLower() == "expensecategories" || m.MasterType.ToLower() == "expense" || m.MasterType.ToLower() == "expenses");
+            }
+            else
+            {
+                query = query.Where(m => m.MasterType.ToLower() == mType);
+            }
         }
 
         if (activeOnly) query = query.Where(m => m.IsActive);
