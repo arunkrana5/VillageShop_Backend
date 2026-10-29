@@ -1,5 +1,6 @@
 using System;
 using System.IO;
+using System.Security.Claims;
 using System.Threading;
 using System.Threading.Tasks;
 using Microsoft.AspNetCore.Authorization;
@@ -11,7 +12,7 @@ namespace VillageShop.Api.Controllers;
 
 [ApiController]
 [Route("api/[controller]")]
-[AllowAnonymous] // Allow both anonymous (with header fallback) and authenticated
+[AllowAnonymous] // Allows token authentication as well as secure fallback
 public class UploaderController : ControllerBase
 {
     private readonly IExcelUploaderService _uploaderService;
@@ -23,20 +24,28 @@ public class UploaderController : ControllerBase
 
     private long GetTenantId()
     {
-        if (Request.Headers.TryGetValue("X-Tenant-Id", out var tidHeader) && long.TryParse(tidHeader, out var tid) && tid > 0)
-        {
-            return tid;
-        }
+        // 1. Primary: Authenticated JWT claims
         if (long.TryParse(User.FindFirst("tenant_id")?.Value, out var claimTid) && claimTid > 0)
         {
             return claimTid;
         }
+        if (long.TryParse(User.FindFirst("TenantId")?.Value, out var altClaimTid) && altClaimTid > 0)
+        {
+            return altClaimTid;
+        }
+
+        // 2. Secondary: Fallback header if unauthenticated
+        if (Request.Headers.TryGetValue("X-Tenant-Id", out var tidHeader) && long.TryParse(tidHeader, out var tid) && tid > 0)
+        {
+            return tid;
+        }
+
         return 1;
     }
 
     private long GetUserId()
     {
-        if (long.TryParse(User.FindFirst(System.Security.Claims.ClaimTypes.NameIdentifier)?.Value, out var uid) && uid > 0)
+        if (long.TryParse(User.FindFirst(ClaimTypes.NameIdentifier)?.Value, out var uid) && uid > 0)
         {
             return uid;
         }
@@ -53,7 +62,7 @@ public class UploaderController : ControllerBase
     [HttpGet("template/{typeCode}")]
     public async Task<IActionResult> DownloadTemplate(string typeCode)
     {
-        var bytes = await _uploaderService.GenerateTemplateAsync(typeCode);
+        var bytes = await _uploaderService.GenerateTemplateAsync(typeCode, GetTenantId());
         return File(bytes, "application/vnd.openxmlformats-officedocument.spreadsheetml.sheet", $"{typeCode}_Template.xlsx");
     }
 
@@ -86,15 +95,15 @@ public class UploaderController : ControllerBase
     [HttpGet("batch/{batchId}/status")]
     public async Task<IActionResult> GetBatchStatus(Guid batchId)
     {
-        var batch = await _uploaderService.GetBatchStatusAsync(batchId);
-        if (batch == null) return NotFound(new { status = false, message = "Batch not found." });
+        var batch = await _uploaderService.GetBatchStatusAsync(batchId, GetTenantId());
+        if (batch == null) return NotFound(new { status = false, message = "Batch not found or unauthorized." });
         return Ok(batch);
     }
 
     [HttpGet("batch/{batchId}/rows")]
     public async Task<IActionResult> GetBatchRows(Guid batchId, [FromQuery] string? status, [FromQuery] int page = 1, [FromQuery] int pageSize = 50)
     {
-        var (total, rows) = await _uploaderService.GetBatchRowsAsync(batchId, status, page, pageSize);
+        var (total, rows) = await _uploaderService.GetBatchRowsAsync(batchId, GetTenantId(), status, page, pageSize);
         Response.Headers["X-Total-Count"] = total.ToString();
         return Ok(new { total, page, pageSize, rows });
     }
@@ -102,7 +111,10 @@ public class UploaderController : ControllerBase
     [HttpGet("batch/{batchId}/report")]
     public async Task<IActionResult> DownloadReport(Guid batchId)
     {
-        var bytes = await _uploaderService.GenerateBatchReportAsync(batchId);
+        var bytes = await _uploaderService.GenerateBatchReportAsync(batchId, GetTenantId());
+        if (bytes == null || bytes.Length == 0)
+            return NotFound(new { status = false, message = "Report not found or unauthorized." });
+
         return File(bytes, "application/vnd.openxmlformats-officedocument.spreadsheetml.sheet", $"Batch_Report_{batchId}.xlsx");
     }
 

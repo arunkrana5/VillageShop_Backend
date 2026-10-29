@@ -7,6 +7,7 @@ public class UploadTypeDto
 {
     public int Id { get; set; }
     public string Code { get; set; } = string.Empty;
+    public string GroupType { get; set; } = "Master"; // "Transaction" or "Master"
     public string Name { get; set; } = string.Empty;
     public string StageTable { get; set; } = string.Empty;
     public string MainTable { get; set; } = string.Empty;
